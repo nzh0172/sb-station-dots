@@ -1,7 +1,7 @@
 # Subway Builder Mod Template
 
 > [!IMPORTANT]
-> This template targets **Modding API v1.0.0** (Subway Builder game version **1.1.0**). Types may not match older or newer game versions.
+> This template targets **Modding API v1.0.0**. Types may not match older or newer game versions.
 
 TypeScript + React template for Subway Builder mods using rolldown-vite. **Please use pnpm!**
 
