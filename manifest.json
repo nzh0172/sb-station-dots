@@ -1,10 +1,10 @@
 {
-  "id": "com.author.modname",
-  "name": "My Mod",
+  "id": "com.naz.connecting-station",
+  "name": "Connecting Station",
   "description": "Description of your mod",
   "version": "1.0.0",
   "author": {
-    "name": "Your Name"
+    "name": "naz"
   },
   "main": "index.js"
 }
