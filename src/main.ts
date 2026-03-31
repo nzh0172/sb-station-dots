@@ -22,7 +22,10 @@ const TOOLBAR_PANEL_TITLE = 'Marker Appearance';
 type CleanupHandle = {
   observer?: MutationObserver;
   unsubscribe?: () => void;
+  removeInteractionListeners?: () => void;
 };
+
+let isApplyingMarkerAppearance = false;
 
 function normalizeColor(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
@@ -44,6 +47,7 @@ function isTransferDot(dot: HTMLElement): boolean {
 }
 
 function applyMarkerAppearance(root: ParentNode): void {
+  isApplyingMarkerAppearance = true;
   const { globalScale, normalStationDotSize, transferDotSize, lineBadgeSize, stationNameSize } = getMarkerAppearance();
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
@@ -76,6 +80,11 @@ function applyMarkerAppearance(root: ParentNode): void {
   stationNames.forEach((name) => {
     name.style.fontSize = `${stationNameSize * globalScale}px`;
   });
+  isApplyingMarkerAppearance = false;
+}
+
+function applyMarkerAppearanceToMarker(marker: HTMLElement): void {
+  applyMarkerAppearance(marker);
 }
 
 function cleanupPreviousInstall(): void {
@@ -84,6 +93,7 @@ function cleanupPreviousInstall(): void {
 
   existing.observer?.disconnect();
   existing.unsubscribe?.();
+  existing.removeInteractionListeners?.();
   delete (window as Window & { [CLEANUP_KEY]?: CleanupHandle })[CLEANUP_KEY];
 }
 
@@ -94,17 +104,51 @@ function hasMarkerAppearanceToolbarButton(): boolean {
 function installMarkerAppearanceController(map: MapLibreMap): void {
   cleanupPreviousInstall();
   applyMarkerAppearance(document);
+  const pendingMarkers = new Set<HTMLElement>();
+  let flushScheduled = false;
+
+  const scheduleMarkerRefresh = (marker: HTMLElement) => {
+    pendingMarkers.add(marker);
+    if (flushScheduled) return;
+
+    flushScheduled = true;
+    requestAnimationFrame(() => {
+      flushScheduled = false;
+      pendingMarkers.forEach((pendingMarker) => {
+        applyMarkerAppearanceToMarker(pendingMarker);
+      });
+      pendingMarkers.clear();
+    });
+  };
 
   const observer = new MutationObserver((mutations) => {
+    if (isApplyingMarkerAppearance) return;
+
     for (const mutation of mutations) {
+      if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
+        const marker = mutation.target.closest('.maplibregl-marker');
+        if (marker instanceof HTMLElement) {
+          scheduleMarkerRefresh(marker);
+        }
+        continue;
+      }
+
       mutation.addedNodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return;
 
         if (node.matches(STATION_DOT_SELECTOR) && isStationMarkerDot(node)) {
-          const { globalScale, normalStationDotSize, transferDotSize } = getMarkerAppearance();
-          const dotSize = (isTransferDot(node) ? transferDotSize : normalStationDotSize) * globalScale;
-          node.style.width = `${dotSize}rem`;
-          node.style.height = `${dotSize}rem`;
+          const marker = node.closest('.maplibregl-marker');
+          if (marker instanceof HTMLElement) {
+            scheduleMarkerRefresh(marker);
+          } else {
+            applyMarkerAppearance(node);
+          }
+          return;
+        }
+
+        const marker = node.closest('.maplibregl-marker');
+        if (marker instanceof HTMLElement) {
+          scheduleMarkerRefresh(marker);
           return;
         }
 
@@ -116,15 +160,39 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class'],
   });
 
   const unsubscribe = subscribeMarkerAppearance(() => {
     applyMarkerAppearance(document);
   });
 
+  const reapplyForInteraction = (event: Event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const marker = target.closest('.maplibregl-marker');
+    if (!(marker instanceof HTMLElement)) return;
+
+    applyMarkerAppearanceToMarker(marker);
+
+    // Some hover states apply after the current event tick.
+    requestAnimationFrame(() => {
+      applyMarkerAppearanceToMarker(marker);
+    });
+  };
+
+  document.addEventListener('mouseover', reapplyForInteraction, true);
+  document.addEventListener('focusin', reapplyForInteraction, true);
+
   (window as Window & { [CLEANUP_KEY]?: CleanupHandle })[CLEANUP_KEY] = {
     observer,
     unsubscribe,
+    removeInteractionListeners: () => {
+      document.removeEventListener('mouseover', reapplyForInteraction, true);
+      document.removeEventListener('focusin', reapplyForInteraction, true);
+    },
   };
 }
 
