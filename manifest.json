@@ -1,7 +1,7 @@
 {
-  "id": "com.naz.connecting-station",
-  "name": "Connecting Station",
-  "description": "Description of your mod",
+  "id": "com.naz.station-dots",
+  "name": "Station Dots",
+  "description": "Change station dot markers appearance in map",
   "version": "1.0.0",
   "author": {
     "name": "naz"

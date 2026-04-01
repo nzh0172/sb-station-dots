@@ -7,9 +7,9 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
 import { getMarkerAppearance, subscribeMarkerAppearance } from './markerAppearance';
 
-const MOD_ID = 'com.author.modname';
+const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
-const TAG = '[MyMod]';
+const TAG = '[Station Dots]';
 const STATION_DOT_SELECTOR = '.maplibregl-marker .rounded-full.relative.border-\\[1px\\]';
 const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative';
 const LINE_BADGE_SELECTOR = '.maplibregl-marker .font-mta.rounded-full.cursor-pointer';
