@@ -17,7 +17,7 @@ const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duratio
 
 const api = window.SubwayBuilderAPI;
 const CLEANUP_KEY = '__markerAppearanceCleanup';
-const TOOLBAR_PANEL_TITLE = 'Marker Appearance';
+const TOOLBAR_PANEL_TITLE = 'Station Dots';
 
 type CleanupHandle = {
   observer?: MutationObserver;
