@@ -3,17 +3,27 @@ export type MarkerAppearanceKey =
   | 'normalStationDotSize'
   | 'transferDotSize'
   | 'lineBadgeSize'
-  | 'stationNameSize';
+  | 'stationNameSize'
+  | 'transferDotColor';
+
+type NumericMarkerAppearanceKey = Exclude<MarkerAppearanceKey, 'transferDotColor'>;
 
 type MarkerAppearanceSetting = {
-  defaultValue: number;
-  min: number;
-  max: number;
-  step: number;
+  defaultValue: number | string;
+  min?: number;
+  max?: number;
+  step?: number;
   storageKey: string;
 };
 
-type MarkerAppearanceState = Record<MarkerAppearanceKey, number>;
+export type MarkerAppearanceState = {
+  globalScale: number;
+  normalStationDotSize: number;
+  transferDotSize: number;
+  lineBadgeSize: number;
+  stationNameSize: number;
+  transferDotColor: string;
+};
 
 const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
   globalScale: {
@@ -51,6 +61,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 1,
     storageKey: 'com.author.modname:station-name-size-px',
   },
+  transferDotColor: {
+    defaultValue: '#ffffff',
+    storageKey: 'com.author.modname:transfer-dot-color',
+  },
 };
 
 const listeners = new Set<(state: MarkerAppearanceState) => void>();
@@ -61,26 +75,44 @@ const state: MarkerAppearanceState = {
   transferDotSize: loadValue('transferDotSize'),
   lineBadgeSize: loadValue('lineBadgeSize'),
   stationNameSize: loadValue('stationNameSize'),
+  transferDotColor: loadValue('transferDotColor'),
 };
 
-function clampValue(key: MarkerAppearanceKey, value: number): number {
+function clampValue(key: NumericMarkerAppearanceKey, value: number): number {
   const setting = SETTINGS[key];
-  return Math.min(setting.max, Math.max(setting.min, value));
+  return Math.min(setting.max!, Math.max(setting.min!, value));
 }
 
-function loadValue(key: MarkerAppearanceKey): number {
+function normalizeHexColor(value: string): string {
+  const normalized = value.trim().toLowerCase();
+
+  if (/^#[0-9a-f]{6}$/.test(normalized)) return normalized;
+
+  if (/^#[0-9a-f]{3}$/.test(normalized)) {
+    return `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`;
+  }
+
+  return '#ffffff';
+}
+
+function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
+
+  if (typeof setting.defaultValue === 'string') {
+    return normalizeHexColor(stored ?? setting.defaultValue) as MarkerAppearanceState[K];
+  }
+
   const parsed = stored ? Number.parseFloat(stored) : Number.NaN;
 
   if (Number.isFinite(parsed)) {
-    return clampValue(key, parsed);
+    return clampValue(key as NumericMarkerAppearanceKey, parsed) as MarkerAppearanceState[K];
   }
 
-  return setting.defaultValue;
+  return setting.defaultValue as MarkerAppearanceState[K];
 }
 
-function saveValue(key: MarkerAppearanceKey, value: number): void {
+function saveValue(key: MarkerAppearanceKey, value: string | number): void {
   window.localStorage.setItem(SETTINGS[key].storageKey, String(value));
 }
 
@@ -103,7 +135,7 @@ export function getMarkerAppearanceRange(key: MarkerAppearanceKey) {
   };
 }
 
-export function setMarkerAppearanceValue(key: MarkerAppearanceKey, value: number): void {
+export function setMarkerAppearanceValue(key: NumericMarkerAppearanceKey, value: number): void {
   const nextValue = clampValue(key, value);
 
   if (nextValue === state[key]) return;
@@ -113,11 +145,30 @@ export function setMarkerAppearanceValue(key: MarkerAppearanceKey, value: number
   emit();
 }
 
+export function setMarkerAppearanceColor(key: 'transferDotColor', value: string): void {
+  const nextValue = normalizeHexColor(value);
+
+  if (nextValue === state[key]) return;
+
+  state[key] = nextValue;
+  saveValue(key, nextValue);
+  emit();
+}
+
 export function resetMarkerAppearance(): void {
-  (Object.keys(SETTINGS) as MarkerAppearanceKey[]).forEach((key) => {
-    state[key] = SETTINGS[key].defaultValue;
-    saveValue(key, state[key]);
-  });
+  state.globalScale = SETTINGS.globalScale.defaultValue as number;
+  state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
+  state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
+  state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
+  state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
+  state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
+
+  saveValue('globalScale', state.globalScale);
+  saveValue('normalStationDotSize', state.normalStationDotSize);
+  saveValue('transferDotSize', state.transferDotSize);
+  saveValue('lineBadgeSize', state.lineBadgeSize);
+  saveValue('stationNameSize', state.stationNameSize);
+  saveValue('transferDotColor', state.transferDotColor);
 
   emit();
 }

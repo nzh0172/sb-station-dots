@@ -3,6 +3,7 @@ import {
   getMarkerAppearance,
   getMarkerAppearanceRange,
   resetMarkerAppearance,
+  setMarkerAppearanceColor,
   setMarkerAppearanceValue,
   subscribeMarkerAppearance,
 } from '../markerAppearance';
@@ -25,12 +26,6 @@ export function TransferDotPanel() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <div>
-        <p className="text-sm font-medium">Marker appearance</p>
-        <p className="text-xs text-muted-foreground">
-          Adjust station dots, line icons, and station name text on the map.
-        </p>
-      </div>
 
       <div className="flex flex-col gap-3">
         <div>
@@ -95,6 +90,35 @@ export function TransferDotPanel() {
 
         <div>
           <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Transfer dot color</p>
+            <span
+              className="h-6 w-6 rounded-full border border-border"
+              style={{ backgroundColor: appearance.transferDotColor }}
+            />
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            <input
+              className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+              type="color"
+              value={appearance.transferDotColor}
+              onChange={(event) => {
+                setMarkerAppearanceColor('transferDotColor', event.target.value);
+              }}
+            />
+            <input
+              className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+              type="text"
+              value={appearance.transferDotColor}
+              onChange={(event) => {
+                setMarkerAppearanceColor('transferDotColor', event.target.value);
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">Line icon size</p>
             <div className="min-w-14 text-right font-mono text-sm">
               {appearance.lineBadgeSize}px
@@ -143,7 +167,7 @@ export function TransferDotPanel() {
         </Button>
         <Button
           onClick={() => api.ui.showNotification(
-            `Scale ${appearance.globalScale.toFixed(2)}x, normal ${appearance.normalStationDotSize.toFixed(2)}rem, transfer ${appearance.transferDotSize.toFixed(2)}rem, icon ${appearance.lineBadgeSize}px, text ${appearance.stationNameSize}px`,
+            `Scale ${appearance.globalScale.toFixed(2)}x, normal ${appearance.normalStationDotSize.toFixed(2)}rem, transfer ${appearance.transferDotSize.toFixed(2)}rem, transfer color ${appearance.transferDotColor}, icon ${appearance.lineBadgeSize}px, text ${appearance.stationNameSize}px`,
             'info',
           )}
         >

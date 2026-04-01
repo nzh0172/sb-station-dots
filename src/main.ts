@@ -46,20 +46,40 @@ function isTransferDot(dot: HTMLElement): boolean {
   );
 }
 
+function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
+  const cachedKind = dot.dataset.stationDotsKind;
+  if (cachedKind === 'transfer' || cachedKind === 'station') {
+    return cachedKind;
+  }
+
+  if (!isStationMarkerDot(dot)) {
+    return null;
+  }
+
+  const kind = isTransferDot(dot) ? 'transfer' : 'station';
+  dot.dataset.stationDotsKind = kind;
+  return kind;
+}
+
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
-  const { globalScale, normalStationDotSize, transferDotSize, lineBadgeSize, stationNameSize } = getMarkerAppearance();
+  const { globalScale, normalStationDotSize, transferDotSize, lineBadgeSize, stationNameSize, transferDotColor } = getMarkerAppearance();
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
 
   dots.forEach((dot) => {
-    if (!isStationMarkerDot(dot)) return;
+    const dotKind = getDotKind(dot);
+    if (!dotKind) return;
 
-    const dotSize = (isTransferDot(dot) ? transferDotSize : normalStationDotSize) * globalScale;
+    const dotSize = (dotKind === 'transfer' ? transferDotSize : normalStationDotSize) * globalScale;
     dot.style.width = `${dotSize}rem`;
     dot.style.height = `${dotSize}rem`;
+
+    if (dotKind === 'transfer') {
+      dot.style.backgroundColor = transferDotColor;
+    }
   });
 
   lineBadgeWrappers.forEach((wrapper) => {
