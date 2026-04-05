@@ -51,6 +51,26 @@ export function TransferDotPanel() {
 
         <div>
           <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Edit route order button scale</p>
+            <div className="min-w-14 text-right font-mono text-sm">
+              {appearance.editRouteOrderButtonScale.toFixed(2)}x
+            </div>
+          </div>
+          <input
+            className="w-full accent-primary"
+            type="range"
+            min={editRouteOrderButtonScaleRange.min}
+            max={editRouteOrderButtonScaleRange.max}
+            step={editRouteOrderButtonScaleRange.step}
+            value={appearance.editRouteOrderButtonScale}
+            onChange={(event) => {
+              setMarkerAppearanceValue('editRouteOrderButtonScale', Number.parseFloat(event.target.value));
+            }}
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">Normal station dot size</p>
             <div className="min-w-14 text-right font-mono text-sm">
               {appearance.normalStationDotSize.toFixed(2)}rem
@@ -138,25 +158,7 @@ export function TransferDotPanel() {
           />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Edit route order button scale</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.editRouteOrderButtonScale.toFixed(2)}x
-            </div>
-          </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={editRouteOrderButtonScaleRange.min}
-            max={editRouteOrderButtonScaleRange.max}
-            step={editRouteOrderButtonScaleRange.step}
-            value={appearance.editRouteOrderButtonScale}
-            onChange={(event) => {
-              setMarkerAppearanceValue('editRouteOrderButtonScale', Number.parseFloat(event.target.value));
-            }}
-          />
-        </div>
+
 
         <div>
           <div className="flex items-center justify-between gap-3">
@@ -186,14 +188,7 @@ export function TransferDotPanel() {
         >
           Reset
         </Button>
-        <Button
-          onClick={() => api.ui.showNotification(
-            `Scale ${appearance.globalScale.toFixed(2)}x, normal ${appearance.normalStationDotSize.toFixed(2)}rem, transfer ${appearance.transferDotSize.toFixed(2)}rem, transfer color ${appearance.transferDotColor}, icon ${appearance.lineBadgeSize}px, route order ${appearance.editRouteOrderButtonScale.toFixed(2)}x, text ${appearance.stationNameSize}px`,
-            'info',
-          )}
-        >
-          Show Value
-        </Button>
+
       </div>
     </div>
   );
