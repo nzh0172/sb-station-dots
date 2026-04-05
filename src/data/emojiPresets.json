@@ -1,0 +1,8 @@
+[
+  { "label": "Flight", "icon": "✈︎" },
+  { "label": "Train", "icon": "🚆" },
+  { "label": "Metro", "icon": "🚇" },
+  { "label": "Bus", "icon": "🚌" },
+  { "label": "Ferry", "icon": "⛴︎" },
+  { "label": "Cable", "icon": "🚠" }
+]

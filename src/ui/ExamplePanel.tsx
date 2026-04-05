@@ -1,4 +1,5 @@
 import { createElement, useEffect, useState } from 'react';
+import emojiPresets from '../data/emojiPresets.json';
 import {
   getMarkerAppearance,
   getMarkerAppearanceRange,
@@ -17,6 +18,17 @@ const lineBadgeRange = getMarkerAppearanceRange('lineBadgeSize');
 const editRouteOrderButtonScaleRange = getMarkerAppearanceRange('editRouteOrderButtonScale');
 const stationNameRange = getMarkerAppearanceRange('stationNameSize');
 const PANEL_COMPONENT_KEY = '__markerAppearanceToolbarComponent';
+const EMOJI_PRESETS = emojiPresets as Array<{ icon: string; label: string }>;
+
+async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(value);
+    api.ui.showNotification(`${label} copied: ${value}`, 'success');
+  } catch (error) {
+    api.ui.showNotification(`Could not copy ${label}.`, 'error');
+    console.error('[Station Dots] Failed to copy emoji:', error);
+  }
+}
 
 export function TransferDotPanel() {
   const [appearance, setAppearance] = useState(getMarkerAppearance());
@@ -178,6 +190,26 @@ export function TransferDotPanel() {
               setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
             }}
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Emoji quick copy</p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EMOJI_PRESETS.map((preset) => (
+              <button
+                key={`${preset.icon}`}
+                className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
+                type="button"
+                title={preset.label}
+                onClick={() => {
+                  void copyEmojiToClipboard(preset.icon, preset.label);
+                }}
+              >
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
