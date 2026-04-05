@@ -14,6 +14,7 @@ const { Button } = api.utils.components as Record<string, React.ComponentType<an
 const globalScaleRange = getMarkerAppearanceRange('globalScale');
 const normalStationDotRange = getMarkerAppearanceRange('normalStationDotSize');
 const transferDotRange = getMarkerAppearanceRange('transferDotSize');
+const transferDotOutlineThicknessRange = getMarkerAppearanceRange('transferDotOutlineThickness');
 const lineBadgeRange = getMarkerAppearanceRange('lineBadgeSize');
 const editRouteOrderButtonScaleRange = getMarkerAppearanceRange('editRouteOrderButtonScale');
 const stationNameRange = getMarkerAppearanceRange('stationNameSize');
@@ -125,8 +126,10 @@ export function TransferDotPanel() {
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">Station group dot color</p>
             <span
-              className="h-6 w-6 rounded-full border border-border"
-              style={{ backgroundColor: appearance.transferDotColor }}
+              className="h-6 w-6 rounded-full"
+              style={{
+                backgroundColor: appearance.transferDotColor,
+              }}
             />
           </div>
 
@@ -148,6 +151,55 @@ export function TransferDotPanel() {
               }}
             />
           </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Station group outline color</p>
+            <span
+              className="h-6 w-6 rounded-full border border-border"
+              style={{ backgroundColor: appearance.transferDotOutlineColor }}
+            />
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            <input
+              className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+              type="color"
+              value={appearance.transferDotOutlineColor}
+              onChange={(event) => {
+                setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+              }}
+            />
+            <input
+              className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+              type="text"
+              value={appearance.transferDotOutlineColor}
+              onChange={(event) => {
+                setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Station group dot outline thickness</p>
+            <div className="min-w-14 text-right font-mono text-sm">
+              {appearance.transferDotOutlineThickness.toFixed(1)}px
+            </div>
+          </div>
+          <input
+            className="w-full accent-primary"
+            type="range"
+            min={transferDotOutlineThicknessRange.min}
+            max={transferDotOutlineThicknessRange.max}
+            step={transferDotOutlineThicknessRange.step}
+            value={appearance.transferDotOutlineThickness}
+            onChange={(event) => {
+              setMarkerAppearanceValue('transferDotOutlineThickness', Number.parseFloat(event.target.value));
+            }}
+          />
         </div>
 
         <div>

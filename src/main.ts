@@ -274,10 +274,12 @@ function applyMarkerAppearance(root: ParentNode): void {
     globalScale,
     normalStationDotSize,
     transferDotSize,
+    transferDotOutlineThickness,
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
     transferDotColor,
+    transferDotOutlineColor,
   } = getMarkerAppearance();
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
@@ -295,6 +297,11 @@ function applyMarkerAppearance(root: ParentNode): void {
 
     if (dotKind === 'transfer') {
       dot.style.backgroundColor = transferDotColor;
+      dot.style.borderColor = transferDotOutlineColor;
+      dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
+    } else {
+      dot.style.borderColor = '';
+      dot.style.borderWidth = '';
     }
   });
 

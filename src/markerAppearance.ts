@@ -2,12 +2,14 @@ export type MarkerAppearanceKey =
   | 'globalScale'
   | 'normalStationDotSize'
   | 'transferDotSize'
+  | 'transferDotOutlineThickness'
   | 'lineBadgeSize'
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
-  | 'transferDotColor';
+  | 'transferDotColor'
+  | 'transferDotOutlineColor';
 
-type NumericMarkerAppearanceKey = Exclude<MarkerAppearanceKey, 'transferDotColor'>;
+type NumericMarkerAppearanceKey = Exclude<MarkerAppearanceKey, 'transferDotColor' | 'transferDotOutlineColor'>;
 
 type MarkerAppearanceSetting = {
   defaultValue: number | string;
@@ -21,10 +23,12 @@ export type MarkerAppearanceState = {
   globalScale: number;
   normalStationDotSize: number;
   transferDotSize: number;
+  transferDotOutlineThickness: number;
   lineBadgeSize: number;
   editRouteOrderButtonScale: number;
   stationNameSize: number;
   transferDotColor: string;
+  transferDotOutlineColor: string;
 };
 
 const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
@@ -48,6 +52,13 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     max: 1.6,
     step: 0.05,
     storageKey: 'com.author.modname:transfer-dot-size-rem',
+  },
+  transferDotOutlineThickness: {
+    defaultValue: 1,
+    min: 0,
+    max: 6,
+    step: 0.5,
+    storageKey: 'com.author.modname:transfer-dot-outline-thickness-px',
   },
   lineBadgeSize: {
     defaultValue: 11,
@@ -74,6 +85,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: '#ffffff',
     storageKey: 'com.author.modname:transfer-dot-color',
   },
+  transferDotOutlineColor: {
+    defaultValue: '#000000',
+    storageKey: 'com.author.modname:transfer-dot-outline-color',
+  },
 };
 
 const listeners = new Set<(state: MarkerAppearanceState) => void>();
@@ -82,10 +97,12 @@ const state: MarkerAppearanceState = {
   globalScale: loadValue('globalScale'),
   normalStationDotSize: loadValue('normalStationDotSize'),
   transferDotSize: loadValue('transferDotSize'),
+  transferDotOutlineThickness: loadValue('transferDotOutlineThickness'),
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
   transferDotColor: loadValue('transferDotColor'),
+  transferDotOutlineColor: loadValue('transferDotOutlineColor'),
 };
 
 function clampValue(key: NumericMarkerAppearanceKey, value: number): number {
@@ -155,7 +172,7 @@ export function setMarkerAppearanceValue(key: NumericMarkerAppearanceKey, value:
   emit();
 }
 
-export function setMarkerAppearanceColor(key: 'transferDotColor', value: string): void {
+export function setMarkerAppearanceColor(key: 'transferDotColor' | 'transferDotOutlineColor', value: string): void {
   const nextValue = normalizeHexColor(value);
 
   if (nextValue === state[key]) return;
@@ -169,18 +186,22 @@ export function resetMarkerAppearance(): void {
   state.globalScale = SETTINGS.globalScale.defaultValue as number;
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
+  state.transferDotOutlineThickness = SETTINGS.transferDotOutlineThickness.defaultValue as number;
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
   state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
+  state.transferDotOutlineColor = SETTINGS.transferDotOutlineColor.defaultValue as string;
 
   saveValue('globalScale', state.globalScale);
   saveValue('normalStationDotSize', state.normalStationDotSize);
   saveValue('transferDotSize', state.transferDotSize);
+  saveValue('transferDotOutlineThickness', state.transferDotOutlineThickness);
   saveValue('lineBadgeSize', state.lineBadgeSize);
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
   saveValue('transferDotColor', state.transferDotColor);
+  saveValue('transferDotOutlineColor', state.transferDotOutlineColor);
 
   emit();
 }
