@@ -102,146 +102,160 @@ export function TransferDotPanel() {
           />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station group dot size</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.transferDotSize.toFixed(2)}rem
+        <div className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Station labels</p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Route icon size</p>
+                <div className="min-w-14 text-right font-mono text-sm">
+                  {appearance.lineBadgeSize}px
+                </div>
+              </div>
+              <input
+                className="w-full accent-primary"
+                type="range"
+                min={lineBadgeRange.min}
+                max={lineBadgeRange.max}
+                step={lineBadgeRange.step}
+                value={appearance.lineBadgeSize}
+                onChange={(event) => {
+                  setMarkerAppearanceValue('lineBadgeSize', Number.parseFloat(event.target.value));
+                }}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Station name text size</p>
+                <div className="min-w-14 text-right font-mono text-sm">
+                  {appearance.stationNameSize}px
+                </div>
+              </div>
+              <input
+                className="w-full accent-primary"
+                type="range"
+                min={stationNameRange.min}
+                max={stationNameRange.max}
+                step={stationNameRange.step}
+                value={appearance.stationNameSize}
+                onChange={(event) => {
+                  setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
+                }}
+              />
             </div>
           </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={transferDotRange.min}
-            max={transferDotRange.max}
-            step={transferDotRange.step}
-            value={appearance.transferDotSize}
-            onChange={(event) => {
-              setMarkerAppearanceValue('transferDotSize', Number.parseFloat(event.target.value));
-            }}
-          />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station group dot color</p>
-            <span
-              className="h-6 w-6 rounded-full"
-              style={{
-                backgroundColor: appearance.transferDotColor,
-              }}
-            />
+        <div className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Station group dots</p>
           </div>
 
-          <div className="mt-3 flex items-center gap-3">
-            <input
-              className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
-              type="color"
-              value={appearance.transferDotColor}
-              onChange={(event) => {
-                setMarkerAppearanceColor('transferDotColor', event.target.value);
-              }}
-            />
-            <input
-              className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
-              type="text"
-              value={appearance.transferDotColor}
-              onChange={(event) => {
-                setMarkerAppearanceColor('transferDotColor', event.target.value);
-              }}
-            />
-          </div>
-        </div>
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Dot size</p>
+                <div className="min-w-14 text-right font-mono text-sm">
+                  {appearance.transferDotSize.toFixed(2)}rem
+                </div>
+              </div>
+              <input
+                className="w-full accent-primary"
+                type="range"
+                min={transferDotRange.min}
+                max={transferDotRange.max}
+                step={transferDotRange.step}
+                value={appearance.transferDotSize}
+                onChange={(event) => {
+                  setMarkerAppearanceValue('transferDotSize', Number.parseFloat(event.target.value));
+                }}
+              />
+            </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station group outline color</p>
-            <span
-              className="h-6 w-6 rounded-full border border-border"
-              style={{ backgroundColor: appearance.transferDotOutlineColor }}
-            />
-          </div>
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Dot color</p>
+                <span
+                  className="h-6 w-6 rounded-full"
+                  style={{
+                    backgroundColor: appearance.transferDotColor,
+                  }}
+                />
+              </div>
 
-          <div className="mt-3 flex items-center gap-3">
-            <input
-              className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
-              type="color"
-              value={appearance.transferDotOutlineColor}
-              onChange={(event) => {
-                setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
-              }}
-            />
-            <input
-              className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
-              type="text"
-              value={appearance.transferDotOutlineColor}
-              onChange={(event) => {
-                setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
-              }}
-            />
-          </div>
-        </div>
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+                  type="color"
+                  value={appearance.transferDotColor}
+                  onChange={(event) => {
+                    setMarkerAppearanceColor('transferDotColor', event.target.value);
+                  }}
+                />
+                <input
+                  className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+                  type="text"
+                  value={appearance.transferDotColor}
+                  onChange={(event) => {
+                    setMarkerAppearanceColor('transferDotColor', event.target.value);
+                  }}
+                />
+              </div>
+            </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station group dot outline thickness</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.transferDotOutlineThickness.toFixed(1)}px
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Outline color</p>
+                <span
+                  className="h-6 w-6 rounded-full border border-border"
+                  style={{ backgroundColor: appearance.transferDotOutlineColor }}
+                />
+              </div>
+
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+                  type="color"
+                  value={appearance.transferDotOutlineColor}
+                  onChange={(event) => {
+                    setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+                  }}
+                />
+                <input
+                  className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+                  type="text"
+                  value={appearance.transferDotOutlineColor}
+                  onChange={(event) => {
+                    setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Outline thickness</p>
+                <div className="min-w-14 text-right font-mono text-sm">
+                  {appearance.transferDotOutlineThickness.toFixed(1)}px
+                </div>
+              </div>
+              <input
+                className="w-full accent-primary"
+                type="range"
+                min={transferDotOutlineThicknessRange.min}
+                max={transferDotOutlineThicknessRange.max}
+                step={transferDotOutlineThicknessRange.step}
+                value={appearance.transferDotOutlineThickness}
+                onChange={(event) => {
+                  setMarkerAppearanceValue('transferDotOutlineThickness', Number.parseFloat(event.target.value));
+                }}
+              />
             </div>
           </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={transferDotOutlineThicknessRange.min}
-            max={transferDotOutlineThicknessRange.max}
-            step={transferDotOutlineThicknessRange.step}
-            value={appearance.transferDotOutlineThickness}
-            onChange={(event) => {
-              setMarkerAppearanceValue('transferDotOutlineThickness', Number.parseFloat(event.target.value));
-            }}
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Line icon size</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.lineBadgeSize}px
-            </div>
-          </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={lineBadgeRange.min}
-            max={lineBadgeRange.max}
-            step={lineBadgeRange.step}
-            value={appearance.lineBadgeSize}
-            onChange={(event) => {
-              setMarkerAppearanceValue('lineBadgeSize', Number.parseFloat(event.target.value));
-            }}
-          />
-        </div>
-
-
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station name text size</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.stationNameSize}px
-            </div>
-          </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={stationNameRange.min}
-            max={stationNameRange.max}
-            step={stationNameRange.step}
-            value={appearance.stationNameSize}
-            onChange={(event) => {
-              setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
-            }}
-          />
         </div>
 
         <div>
