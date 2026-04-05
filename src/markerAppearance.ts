@@ -3,6 +3,7 @@ export type MarkerAppearanceKey =
   | 'normalStationDotSize'
   | 'transferDotSize'
   | 'lineBadgeSize'
+  | 'editRouteOrderButtonScale'
   | 'stationNameSize'
   | 'transferDotColor';
 
@@ -21,6 +22,7 @@ export type MarkerAppearanceState = {
   normalStationDotSize: number;
   transferDotSize: number;
   lineBadgeSize: number;
+  editRouteOrderButtonScale: number;
   stationNameSize: number;
   transferDotColor: string;
 };
@@ -54,6 +56,13 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 1,
     storageKey: 'com.author.modname:line-badge-size-px',
   },
+  editRouteOrderButtonScale: {
+    defaultValue: 1,
+    min: 0.5,
+    max: 2,
+    step: 0.05,
+    storageKey: 'com.author.modname:edit-route-order-button-scale',
+  },
   stationNameSize: {
     defaultValue: 11,
     min: 8,
@@ -74,6 +83,7 @@ const state: MarkerAppearanceState = {
   normalStationDotSize: loadValue('normalStationDotSize'),
   transferDotSize: loadValue('transferDotSize'),
   lineBadgeSize: loadValue('lineBadgeSize'),
+  editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
   transferDotColor: loadValue('transferDotColor'),
 };
@@ -160,6 +170,7 @@ export function resetMarkerAppearance(): void {
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
+  state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
   state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
 
@@ -167,6 +178,7 @@ export function resetMarkerAppearance(): void {
   saveValue('normalStationDotSize', state.normalStationDotSize);
   saveValue('transferDotSize', state.transferDotSize);
   saveValue('lineBadgeSize', state.lineBadgeSize);
+  saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
   saveValue('transferDotColor', state.transferDotColor);
 

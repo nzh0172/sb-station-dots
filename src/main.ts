@@ -11,8 +11,10 @@ const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
 const TAG = '[Station Dots]';
 const STATION_DOT_SELECTOR = '.maplibregl-marker .rounded-full.relative.border-\\[1px\\]';
-const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative';
+const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative:has(> .font-mta.cursor-pointer)';
 const LINE_BADGE_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative > .font-mta.cursor-pointer';
+const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
+  '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5 > .cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
 
 const api = window.SubwayBuilderAPI;
@@ -40,6 +42,21 @@ type LineBadgeWrapperMetrics = {
   maxHeight: number;
 };
 
+type EditRouteOrderButtonMetrics = {
+  width: number;
+  height: number;
+  maxHeight: number;
+};
+
+type EditRouteOrderIconMetrics = {
+  width: number;
+  height: number;
+};
+
+type EditRouteOrderLabelMetrics = {
+  fontSize: number;
+};
+
 function parsePixelValue(value: string | null | undefined): number | null {
   if (!value) return null;
 
@@ -51,21 +68,31 @@ function parsePixelValue(value: string | null | undefined): number | null {
 }
 
 function getElementHeight(element: HTMLElement): number {
-  const inlineHeight = parsePixelValue(element.style.height);
-  if (inlineHeight !== null && inlineHeight > 0) return inlineHeight;
-
   const computedHeight = parsePixelValue(getComputedStyle(element).height);
   if (computedHeight !== null && computedHeight > 0) return computedHeight;
+
+  const inlineHeight = parsePixelValue(element.style.height);
+  if (inlineHeight !== null && inlineHeight > 0) return inlineHeight;
 
   return element.getBoundingClientRect().height;
 }
 
 function getElementMinWidth(element: HTMLElement): number {
+  const computedMinWidth = parsePixelValue(getComputedStyle(element).minWidth);
+  if (computedMinWidth !== null && computedMinWidth > 0) return computedMinWidth;
+
   const inlineMinWidth = parsePixelValue(element.style.minWidth);
   if (inlineMinWidth !== null && inlineMinWidth > 0) return inlineMinWidth;
 
-  const computedMinWidth = parsePixelValue(getComputedStyle(element).minWidth);
-  if (computedMinWidth !== null && computedMinWidth > 0) return computedMinWidth;
+  return element.getBoundingClientRect().width;
+}
+
+function getElementWidth(element: HTMLElement): number {
+  const computedWidth = parsePixelValue(getComputedStyle(element).width);
+  if (computedWidth !== null && computedWidth > 0) return computedWidth;
+
+  const inlineWidth = parsePixelValue(element.style.width);
+  if (inlineWidth !== null && inlineWidth > 0) return inlineWidth;
 
   return element.getBoundingClientRect().width;
 }
@@ -138,6 +165,75 @@ function getBaseLineBadgeWrapperMetrics(wrapper: HTMLElement): LineBadgeWrapperM
   return metrics;
 }
 
+function getBaseEditRouteOrderButtonMetrics(button: HTMLElement): EditRouteOrderButtonMetrics {
+  const cachedWidth = Number.parseFloat(button.dataset.stationDotsRouteButtonBaseWidth ?? '');
+  const cachedHeight = Number.parseFloat(button.dataset.stationDotsRouteButtonBaseHeight ?? '');
+  const cachedMaxHeight = Number.parseFloat(button.dataset.stationDotsRouteButtonBaseMaxHeight ?? '');
+
+  if (Number.isFinite(cachedWidth) && Number.isFinite(cachedHeight) && Number.isFinite(cachedMaxHeight)) {
+    return {
+      width: cachedWidth,
+      height: cachedHeight,
+      maxHeight: cachedMaxHeight,
+    };
+  }
+
+  const computedStyle = getComputedStyle(button);
+  const metrics: EditRouteOrderButtonMetrics = {
+    width: getElementWidth(button),
+    height: getElementHeight(button),
+    maxHeight: parsePixelValue(computedStyle.maxHeight) ?? getElementHeight(button),
+  };
+
+  button.dataset.stationDotsRouteButtonBaseWidth = String(metrics.width);
+  button.dataset.stationDotsRouteButtonBaseHeight = String(metrics.height);
+  button.dataset.stationDotsRouteButtonBaseMaxHeight = String(metrics.maxHeight);
+
+  return metrics;
+}
+
+function getBaseEditRouteOrderIconMetrics(icon: SVGSVGElement): EditRouteOrderIconMetrics {
+  const cachedWidth = Number.parseFloat(icon.dataset.stationDotsRouteButtonIconBaseWidth ?? '');
+  const cachedHeight = Number.parseFloat(icon.dataset.stationDotsRouteButtonIconBaseHeight ?? '');
+
+  if (Number.isFinite(cachedWidth) && Number.isFinite(cachedHeight)) {
+    return {
+      width: cachedWidth,
+      height: cachedHeight,
+    };
+  }
+
+  const computedStyle = getComputedStyle(icon);
+  const metrics: EditRouteOrderIconMetrics = {
+    width: parsePixelValue(computedStyle.width) ?? icon.getBoundingClientRect().width,
+    height: parsePixelValue(computedStyle.height) ?? icon.getBoundingClientRect().height,
+  };
+
+  icon.dataset.stationDotsRouteButtonIconBaseWidth = String(metrics.width);
+  icon.dataset.stationDotsRouteButtonIconBaseHeight = String(metrics.height);
+
+  return metrics;
+}
+
+function getBaseEditRouteOrderLabelMetrics(label: HTMLElement): EditRouteOrderLabelMetrics {
+  const cachedFontSize = Number.parseFloat(label.dataset.stationDotsRouteButtonLabelBaseFontSize ?? '');
+
+  if (Number.isFinite(cachedFontSize)) {
+    return {
+      fontSize: cachedFontSize,
+    };
+  }
+
+  const computedStyle = getComputedStyle(label);
+  const metrics: EditRouteOrderLabelMetrics = {
+    fontSize: parsePixelValue(computedStyle.fontSize) ?? 0,
+  };
+
+  label.dataset.stationDotsRouteButtonLabelBaseFontSize = String(metrics.fontSize);
+
+  return metrics;
+}
+
 function normalizeColor(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
 }
@@ -174,10 +270,19 @@ function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
 
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
-  const { globalScale, normalStationDotSize, transferDotSize, lineBadgeSize, stationNameSize, transferDotColor } = getMarkerAppearance();
+  const {
+    globalScale,
+    normalStationDotSize,
+    transferDotSize,
+    lineBadgeSize,
+    editRouteOrderButtonScale,
+    stationNameSize,
+    transferDotColor,
+  } = getMarkerAppearance();
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);
+  const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
 
   dots.forEach((dot) => {
@@ -222,6 +327,31 @@ function applyMarkerAppearance(root: ParentNode): void {
       }
 
       label.style.transform = scalePixelTransforms(label.dataset.stationDotsBaseTransform, scale);
+    }
+  });
+
+  editRouteOrderButtons.forEach((button) => {
+    const scale = editRouteOrderButtonScale;
+    const buttonMetrics = getBaseEditRouteOrderButtonMetrics(button);
+
+    button.style.transitionProperty = 'background-color, border-color, border-width, transform';
+    button.style.width = `${buttonMetrics.width * scale}px`;
+    button.style.height = `${buttonMetrics.height * scale}px`;
+    button.style.maxHeight = `${buttonMetrics.maxHeight * scale}px`;
+
+    const icon = button.querySelector<SVGSVGElement>(':scope > svg.lucide-plus');
+    if (icon) {
+      const iconMetrics = getBaseEditRouteOrderIconMetrics(icon);
+      icon.style.transitionProperty = 'color, opacity, transform';
+      icon.style.width = `${iconMetrics.width * scale}px`;
+      icon.style.height = `${iconMetrics.height * scale}px`;
+    }
+
+    const label = button.querySelector<HTMLElement>(':scope > .text-white.font-semibold.leading-none');
+    if (label) {
+      const labelMetrics = getBaseEditRouteOrderLabelMetrics(label);
+      label.style.transitionProperty = 'color, opacity, transform';
+      label.style.fontSize = `${labelMetrics.fontSize * scale}px`;
     }
   });
 
