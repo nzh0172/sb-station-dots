@@ -71,7 +71,7 @@ export function TransferDotPanel() {
 
         <div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Transfer dot size</p>
+            <p className="text-sm font-medium">Station group dot size</p>
             <div className="min-w-14 text-right font-mono text-sm">
               {appearance.transferDotSize.toFixed(2)}rem
             </div>
@@ -91,7 +91,7 @@ export function TransferDotPanel() {
 
         <div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Transfer dot color</p>
+            <p className="text-sm font-medium">Station group dot color</p>
             <span
               className="h-6 w-6 rounded-full border border-border"
               style={{ backgroundColor: appearance.transferDotColor }}
@@ -160,7 +160,7 @@ export function TransferDotPanel() {
 
         <div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Station name text</p>
+            <p className="text-sm font-medium">Station name text size</p>
             <div className="min-w-14 text-right font-mono text-sm">
               {appearance.stationNameSize}px
             </div>
