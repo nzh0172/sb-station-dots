@@ -12,7 +12,7 @@ const MOD_VERSION = '1.0.0';
 const TAG = '[Station Dots]';
 const STATION_DOT_SELECTOR = '.maplibregl-marker .rounded-full.relative.border-\\[1px\\]';
 const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative';
-const LINE_BADGE_SELECTOR = '.maplibregl-marker .font-mta.rounded-full.cursor-pointer';
+const LINE_BADGE_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative > .font-mta.cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
 
 const api = window.SubwayBuilderAPI;
@@ -26,6 +26,117 @@ type CleanupHandle = {
 };
 
 let isApplyingMarkerAppearance = false;
+
+type LineBadgeMetrics = {
+  height: number;
+  minWidth: number;
+  fontSize: number;
+  paddingLeft: number;
+  paddingRight: number;
+};
+
+type LineBadgeWrapperMetrics = {
+  height: number;
+  maxHeight: number;
+};
+
+function parsePixelValue(value: string | null | undefined): number | null {
+  if (!value) return null;
+
+  const match = value.match(/-?\d*\.?\d+/);
+  if (!match) return null;
+
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getElementHeight(element: HTMLElement): number {
+  const inlineHeight = parsePixelValue(element.style.height);
+  if (inlineHeight !== null && inlineHeight > 0) return inlineHeight;
+
+  const computedHeight = parsePixelValue(getComputedStyle(element).height);
+  if (computedHeight !== null && computedHeight > 0) return computedHeight;
+
+  return element.getBoundingClientRect().height;
+}
+
+function getElementMinWidth(element: HTMLElement): number {
+  const inlineMinWidth = parsePixelValue(element.style.minWidth);
+  if (inlineMinWidth !== null && inlineMinWidth > 0) return inlineMinWidth;
+
+  const computedMinWidth = parsePixelValue(getComputedStyle(element).minWidth);
+  if (computedMinWidth !== null && computedMinWidth > 0) return computedMinWidth;
+
+  return element.getBoundingClientRect().width;
+}
+
+function scalePixelTransforms(value: string, scale: number): string {
+  if (!value || scale === 1) return value;
+  return value.replace(/(-?\d*\.?\d+)px/g, (_, numericValue: string) => `${Number.parseFloat(numericValue) * scale}px`);
+}
+
+function getBaseLineBadgeMetrics(badge: HTMLElement): LineBadgeMetrics {
+  const cachedHeight = Number.parseFloat(badge.dataset.stationDotsBaseHeight ?? '');
+  const cachedMinWidth = Number.parseFloat(badge.dataset.stationDotsBaseMinWidth ?? '');
+  const cachedFontSize = Number.parseFloat(badge.dataset.stationDotsBaseFontSize ?? '');
+  const cachedPaddingLeft = Number.parseFloat(badge.dataset.stationDotsBasePaddingLeft ?? '');
+  const cachedPaddingRight = Number.parseFloat(badge.dataset.stationDotsBasePaddingRight ?? '');
+
+  if (
+    Number.isFinite(cachedHeight) &&
+    Number.isFinite(cachedMinWidth) &&
+    Number.isFinite(cachedFontSize) &&
+    Number.isFinite(cachedPaddingLeft) &&
+    Number.isFinite(cachedPaddingRight)
+  ) {
+    return {
+      height: cachedHeight,
+      minWidth: cachedMinWidth,
+      fontSize: cachedFontSize,
+      paddingLeft: cachedPaddingLeft,
+      paddingRight: cachedPaddingRight,
+    };
+  }
+
+  const computedStyle = getComputedStyle(badge);
+  const metrics: LineBadgeMetrics = {
+    height: getElementHeight(badge),
+    minWidth: getElementMinWidth(badge),
+    fontSize: parsePixelValue(computedStyle.fontSize) ?? 0,
+    paddingLeft: parsePixelValue(computedStyle.paddingLeft) ?? 0,
+    paddingRight: parsePixelValue(computedStyle.paddingRight) ?? 0,
+  };
+
+  badge.dataset.stationDotsBaseHeight = String(metrics.height);
+  badge.dataset.stationDotsBaseMinWidth = String(metrics.minWidth);
+  badge.dataset.stationDotsBaseFontSize = String(metrics.fontSize);
+  badge.dataset.stationDotsBasePaddingLeft = String(metrics.paddingLeft);
+  badge.dataset.stationDotsBasePaddingRight = String(metrics.paddingRight);
+
+  return metrics;
+}
+
+function getBaseLineBadgeWrapperMetrics(wrapper: HTMLElement): LineBadgeWrapperMetrics {
+  const cachedHeight = Number.parseFloat(wrapper.dataset.stationDotsBaseHeight ?? '');
+  const cachedMaxHeight = Number.parseFloat(wrapper.dataset.stationDotsBaseMaxHeight ?? '');
+
+  if (Number.isFinite(cachedHeight) && Number.isFinite(cachedMaxHeight)) {
+    return {
+      height: cachedHeight,
+      maxHeight: cachedMaxHeight,
+    };
+  }
+
+  const computedStyle = getComputedStyle(wrapper);
+  const height = getElementHeight(wrapper);
+  const maxHeight = parsePixelValue(computedStyle.maxHeight) ?? height;
+  const metrics: LineBadgeWrapperMetrics = { height, maxHeight };
+
+  wrapper.dataset.stationDotsBaseHeight = String(metrics.height);
+  wrapper.dataset.stationDotsBaseMaxHeight = String(metrics.maxHeight);
+
+  return metrics;
+}
 
 function normalizeColor(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
@@ -84,17 +195,34 @@ function applyMarkerAppearance(root: ParentNode): void {
 
   lineBadgeWrappers.forEach((wrapper) => {
     const effectiveLineBadgeSize = lineBadgeSize * globalScale;
-    wrapper.style.height = `${effectiveLineBadgeSize}px`;
-    wrapper.style.maxHeight = `${effectiveLineBadgeSize}px`;
+    const metrics = getBaseLineBadgeWrapperMetrics(wrapper);
+    const referenceBadge = wrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer');
+    const referenceHeight = referenceBadge ? getBaseLineBadgeMetrics(referenceBadge).height : metrics.height;
+    const scale = referenceHeight > 0 ? effectiveLineBadgeSize / referenceHeight : 1;
+
+    wrapper.style.height = `${metrics.height * scale}px`;
+    wrapper.style.maxHeight = `${metrics.maxHeight * scale}px`;
   });
 
   lineBadges.forEach((badge) => {
     const effectiveLineBadgeSize = lineBadgeSize * globalScale;
-    badge.style.minWidth = `${effectiveLineBadgeSize}px`;
+    const metrics = getBaseLineBadgeMetrics(badge);
+    const scale = metrics.height > 0 ? effectiveLineBadgeSize / metrics.height : 1;
+
+    badge.style.minWidth = `${metrics.minWidth * scale}px`;
     badge.style.height = `${effectiveLineBadgeSize}px`;
-    badge.style.fontSize = `${Math.max(8, effectiveLineBadgeSize * 0.8)}px`;
-    badge.style.paddingLeft = `${Math.max(0, effectiveLineBadgeSize * 0.25)}px`;
-    badge.style.paddingRight = `${Math.max(0, effectiveLineBadgeSize * 0.25)}px`;
+    badge.style.fontSize = `${Math.max(8, metrics.fontSize * scale)}px`;
+    badge.style.paddingLeft = `${Math.max(0, metrics.paddingLeft * scale)}px`;
+    badge.style.paddingRight = `${Math.max(0, metrics.paddingRight * scale)}px`;
+
+    const label = badge.querySelector<HTMLElement>(':scope > span');
+    if (label) {
+      if (label.dataset.stationDotsBaseTransform === undefined) {
+        label.dataset.stationDotsBaseTransform = label.style.transform || '';
+      }
+
+      label.style.transform = scalePixelTransforms(label.dataset.stationDotsBaseTransform, scale);
+    }
   });
 
   stationNames.forEach((name) => {
