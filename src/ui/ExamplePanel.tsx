@@ -82,24 +82,32 @@ export function TransferDotPanel() {
           />
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Normal station dot size</p>
-            <div className="min-w-14 text-right font-mono text-sm">
-              {appearance.normalStationDotSize.toFixed(2)}rem
+        <div className="rounded-xl border border-border bg-background/40 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Normal station dots</p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Dot size</p>
+                <div className="min-w-14 text-right font-mono text-sm">
+                  {appearance.normalStationDotSize.toFixed(2)}rem
+                </div>
+              </div>
+              <input
+                className="w-full accent-primary"
+                type="range"
+                min={normalStationDotRange.min}
+                max={normalStationDotRange.max}
+                step={normalStationDotRange.step}
+                value={appearance.normalStationDotSize}
+                onChange={(event) => {
+                  setMarkerAppearanceValue('normalStationDotSize', Number.parseFloat(event.target.value));
+                }}
+              />
             </div>
           </div>
-          <input
-            className="w-full accent-primary"
-            type="range"
-            min={normalStationDotRange.min}
-            max={normalStationDotRange.max}
-            step={normalStationDotRange.step}
-            value={appearance.normalStationDotSize}
-            onChange={(event) => {
-              setMarkerAppearanceValue('normalStationDotSize', Number.parseFloat(event.target.value));
-            }}
-          />
         </div>
 
         <div className="rounded-xl border border-border bg-background/40 p-3">
