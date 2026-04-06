@@ -1,7 +1,10 @@
 export type MarkerAppearanceKey =
   | 'globalScale'
   | 'normalStationDotSize'
+  | 'normalStationDotShape'
+  | 'normalStationDotOutlineThickness'
   | 'transferDotSize'
+  | 'transferDotShape'
   | 'transferDotOutlineThickness'
   | 'lineBadgeSize'
   | 'editRouteOrderButtonScale'
@@ -9,7 +12,12 @@ export type MarkerAppearanceKey =
   | 'transferDotColor'
   | 'transferDotOutlineColor';
 
-type NumericMarkerAppearanceKey = Exclude<MarkerAppearanceKey, 'transferDotColor' | 'transferDotOutlineColor'>;
+type NumericMarkerAppearanceKey = Exclude<
+  MarkerAppearanceKey,
+  'normalStationDotShape' | 'transferDotShape' | 'transferDotColor' | 'transferDotOutlineColor'
+>;
+
+export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 
 type MarkerAppearanceSetting = {
   defaultValue: number | string;
@@ -22,7 +30,10 @@ type MarkerAppearanceSetting = {
 export type MarkerAppearanceState = {
   globalScale: number;
   normalStationDotSize: number;
+  normalStationDotShape: NormalStationDotShape;
+  normalStationDotOutlineThickness: number;
   transferDotSize: number;
+  transferDotShape: NormalStationDotShape;
   transferDotOutlineThickness: number;
   lineBadgeSize: number;
   editRouteOrderButtonScale: number;
@@ -46,12 +57,27 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 0.05,
     storageKey: 'com.author.modname:normal-station-dot-size-rem',
   },
+  normalStationDotShape: {
+    defaultValue: 'circle',
+    storageKey: 'com.author.modname:normal-station-dot-shape',
+  },
+  normalStationDotOutlineThickness: {
+    defaultValue: 1,
+    min: 0,
+    max: 6,
+    step: 0.5,
+    storageKey: 'com.author.modname:normal-station-dot-outline-thickness-px',
+  },
   transferDotSize: {
     defaultValue: 0.8,
     min: 0.45,
     max: 1.6,
     step: 0.05,
     storageKey: 'com.author.modname:transfer-dot-size-rem',
+  },
+  transferDotShape: {
+    defaultValue: 'circle',
+    storageKey: 'com.author.modname:transfer-dot-shape',
   },
   transferDotOutlineThickness: {
     defaultValue: 1,
@@ -96,7 +122,10 @@ const listeners = new Set<(state: MarkerAppearanceState) => void>();
 const state: MarkerAppearanceState = {
   globalScale: loadValue('globalScale'),
   normalStationDotSize: loadValue('normalStationDotSize'),
+  normalStationDotShape: loadValue('normalStationDotShape'),
+  normalStationDotOutlineThickness: loadValue('normalStationDotOutlineThickness'),
   transferDotSize: loadValue('transferDotSize'),
+  transferDotShape: loadValue('transferDotShape'),
   transferDotOutlineThickness: loadValue('transferDotOutlineThickness'),
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
@@ -122,9 +151,24 @@ function normalizeHexColor(value: string): string {
   return '#ffffff';
 }
 
+function normalizeStationDotShape(value: string): NormalStationDotShape {
+  switch (value.trim().toLowerCase()) {
+    case 'square':
+      return 'square';
+    case 'diamond':
+      return 'diamond';
+    default:
+      return 'circle';
+  }
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
+
+  if (key === 'normalStationDotShape' || key === 'transferDotShape') {
+    return normalizeStationDotShape(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
 
   if (typeof setting.defaultValue === 'string') {
     return normalizeHexColor(stored ?? setting.defaultValue) as MarkerAppearanceState[K];
@@ -182,10 +226,23 @@ export function setMarkerAppearanceColor(key: 'transferDotColor' | 'transferDotO
   emit();
 }
 
+export function setMarkerAppearanceShape(key: 'normalStationDotShape' | 'transferDotShape', value: string): void {
+  const nextValue = normalizeStationDotShape(value);
+
+  if (nextValue === state[key]) return;
+
+  state[key] = nextValue;
+  saveValue(key, nextValue);
+  emit();
+}
+
 export function resetMarkerAppearance(): void {
   state.globalScale = SETTINGS.globalScale.defaultValue as number;
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
+  state.normalStationDotShape = SETTINGS.normalStationDotShape.defaultValue as NormalStationDotShape;
+  state.normalStationDotOutlineThickness = SETTINGS.normalStationDotOutlineThickness.defaultValue as number;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
+  state.transferDotShape = SETTINGS.transferDotShape.defaultValue as NormalStationDotShape;
   state.transferDotOutlineThickness = SETTINGS.transferDotOutlineThickness.defaultValue as number;
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
@@ -195,7 +252,10 @@ export function resetMarkerAppearance(): void {
 
   saveValue('globalScale', state.globalScale);
   saveValue('normalStationDotSize', state.normalStationDotSize);
+  saveValue('normalStationDotShape', state.normalStationDotShape);
+  saveValue('normalStationDotOutlineThickness', state.normalStationDotOutlineThickness);
   saveValue('transferDotSize', state.transferDotSize);
+  saveValue('transferDotShape', state.transferDotShape);
   saveValue('transferDotOutlineThickness', state.transferDotOutlineThickness);
   saveValue('lineBadgeSize', state.lineBadgeSize);
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);

@@ -5,6 +5,7 @@ import {
   getMarkerAppearanceRange,
   resetMarkerAppearance,
   setMarkerAppearanceColor,
+  setMarkerAppearanceShape,
   setMarkerAppearanceValue,
   subscribeMarkerAppearance,
 } from '../markerAppearance';
@@ -13,6 +14,7 @@ const api = window.SubwayBuilderAPI;
 const { Button } = api.utils.components as Record<string, React.ComponentType<any>>;
 const globalScaleRange = getMarkerAppearanceRange('globalScale');
 const normalStationDotRange = getMarkerAppearanceRange('normalStationDotSize');
+const normalStationDotOutlineThicknessRange = getMarkerAppearanceRange('normalStationDotOutlineThickness');
 const transferDotRange = getMarkerAppearanceRange('transferDotSize');
 const transferDotOutlineThicknessRange = getMarkerAppearanceRange('transferDotOutlineThickness');
 const lineBadgeRange = getMarkerAppearanceRange('lineBadgeSize');
@@ -20,6 +22,11 @@ const editRouteOrderButtonScaleRange = getMarkerAppearanceRange('editRouteOrderB
 const stationNameRange = getMarkerAppearanceRange('stationNameSize');
 const PANEL_COMPONENT_KEY = '__markerAppearanceToolbarComponent';
 const EMOJI_PRESETS = emojiPresets as Array<{ icon: string; label: string }>;
+const NORMAL_STATION_DOT_SHAPES = [
+  { label: 'Circle', value: 'circle' },
+  { label: 'Square', value: 'square' },
+  { label: 'Diamond', value: 'diamond' },
+] as const;
 
 async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
   try {
@@ -115,6 +122,56 @@ export function TransferDotPanel() {
                   }}
                 />
               </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Dot shape</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.normalStationDotShape}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {NORMAL_STATION_DOT_SHAPES.map((shape) => {
+                    const isActive = appearance.normalStationDotShape === shape.value;
+                    return (
+                      <button
+                        key={shape.value}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-background hover:bg-accent'
+                        }`}
+                        type="button"
+                        onClick={() => {
+                          setMarkerAppearanceShape('normalStationDotShape', shape.value);
+                        }}
+                      >
+                        {shape.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Outline thickness</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.normalStationDotOutlineThickness.toFixed(1)}px
+                  </div>
+                </div>
+                <input
+                  className="w-full accent-primary"
+                  type="range"
+                  min={normalStationDotOutlineThicknessRange.min}
+                  max={normalStationDotOutlineThicknessRange.max}
+                  step={normalStationDotOutlineThicknessRange.step}
+                  value={appearance.normalStationDotOutlineThickness}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('normalStationDotOutlineThickness', Number.parseFloat(event.target.value));
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -164,6 +221,7 @@ export function TransferDotPanel() {
                 />
               </div>
             </div>
+
           </div>
         </div>
 
@@ -192,6 +250,36 @@ export function TransferDotPanel() {
                     setMarkerAppearanceValue('transferDotSize', Number.parseFloat(event.target.value));
                   }}
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Dot shape</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.transferDotShape}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {NORMAL_STATION_DOT_SHAPES.map((shape) => {
+                    const isActive = appearance.transferDotShape === shape.value;
+                    return (
+                      <button
+                        key={`${shape.value}`}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-background hover:bg-accent'
+                        }`}
+                        type="button"
+                        onClick={() => {
+                          setMarkerAppearanceShape('transferDotShape', shape.value);
+                        }}
+                      >
+                        {shape.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>

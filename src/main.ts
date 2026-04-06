@@ -5,7 +5,7 @@
 
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
-import { getMarkerAppearance, subscribeMarkerAppearance } from './markerAppearance';
+import { getMarkerAppearance, subscribeMarkerAppearance, type NormalStationDotShape } from './markerAppearance';
 
 const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
@@ -268,12 +268,33 @@ function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
   return kind;
 }
 
+function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotShape): void {
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+
+  if (shape === 'square') {
+    dot.style.borderRadius = '0';
+    return;
+  }
+
+  if (shape === 'diamond') {
+    dot.style.borderRadius = '0';
+    dot.style.transform = 'rotate(45deg) scale(0.85)';
+    return;
+  }
+
+  dot.style.borderRadius = '9999px';
+}
+
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
   const {
     globalScale,
     normalStationDotSize,
+    normalStationDotShape,
+    normalStationDotOutlineThickness,
     transferDotSize,
+    transferDotShape,
     transferDotOutlineThickness,
     lineBadgeSize,
     editRouteOrderButtonScale,
@@ -296,12 +317,14 @@ function applyMarkerAppearance(root: ParentNode): void {
     dot.style.height = `${dotSize}rem`;
 
     if (dotKind === 'transfer') {
+      applyNormalStationDotShape(dot, transferDotShape);
       dot.style.backgroundColor = transferDotColor;
       dot.style.borderColor = transferDotOutlineColor;
       dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
     } else {
+      applyNormalStationDotShape(dot, normalStationDotShape);
       dot.style.borderColor = '';
-      dot.style.borderWidth = '';
+      dot.style.borderWidth = `${normalStationDotOutlineThickness * globalScale}px`;
     }
   });
 
