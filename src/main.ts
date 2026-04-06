@@ -504,7 +504,7 @@ if (!api) {
           icon: 'Circle',
           tooltip: TOOLBAR_PANEL_TITLE,
           title: TOOLBAR_PANEL_TITLE,
-          width: 360,
+          width: 680,
           render: MarkerAppearanceToolbarHost,
         });
       }
