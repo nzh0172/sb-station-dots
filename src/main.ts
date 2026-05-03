@@ -16,6 +16,9 @@ const LINE_BADGE_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative > .f
 const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
   '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5 > .cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
+const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
+const STATION_NAME_HOVER_SCALE = 1.18;
+const HOVER_ANIMATION_DURATION_MS = 140;
 
 const api = window.SubwayBuilderAPI;
 const CLEANUP_KEY = '__markerAppearanceCleanup';
@@ -55,6 +58,10 @@ type EditRouteOrderIconMetrics = {
 
 type EditRouteOrderLabelMetrics = {
   fontSize: number;
+};
+
+type StationNameWrapperMetrics = {
+  maxWidth: number;
 };
 
 function parsePixelValue(value: string | null | undefined): number | null {
@@ -97,9 +104,23 @@ function getElementWidth(element: HTMLElement): number {
   return element.getBoundingClientRect().width;
 }
 
+function getElementMaxWidth(element: HTMLElement): number {
+  const computedMaxWidth = parsePixelValue(getComputedStyle(element).maxWidth);
+  if (computedMaxWidth !== null && computedMaxWidth > 0) return computedMaxWidth;
+
+  const inlineMaxWidth = parsePixelValue(element.style.maxWidth);
+  if (inlineMaxWidth !== null && inlineMaxWidth > 0) return inlineMaxWidth;
+
+  return element.getBoundingClientRect().width;
+}
+
 function scalePixelTransforms(value: string, scale: number): string {
   if (!value || scale === 1) return value;
   return value.replace(/(-?\d*\.?\d+)px/g, (_, numericValue: string) => `${Number.parseFloat(numericValue) * scale}px`);
+}
+
+function isMarkerActive(marker: HTMLElement): boolean {
+  return marker.matches(':hover') || marker.contains(document.activeElement);
 }
 
 function getBaseLineBadgeMetrics(badge: HTMLElement): LineBadgeMetrics {
@@ -140,6 +161,20 @@ function getBaseLineBadgeMetrics(badge: HTMLElement): LineBadgeMetrics {
   badge.dataset.stationDotsBasePaddingLeft = String(metrics.paddingLeft);
   badge.dataset.stationDotsBasePaddingRight = String(metrics.paddingRight);
 
+  return metrics;
+}
+
+function getBaseStationNameWrapperMetrics(wrapper: HTMLElement): StationNameWrapperMetrics {
+  const cachedMaxWidth = Number.parseFloat(wrapper.dataset.stationDotsBaseMaxWidth ?? '');
+  if (Number.isFinite(cachedMaxWidth)) {
+    return { maxWidth: cachedMaxWidth };
+  }
+
+  const metrics: StationNameWrapperMetrics = {
+    maxWidth: getElementMaxWidth(wrapper),
+  };
+
+  wrapper.dataset.stationDotsBaseMaxWidth = String(metrics.maxWidth);
   return metrics;
 }
 
@@ -334,21 +369,34 @@ function applyMarkerAppearance(root: ParentNode): void {
     const referenceBadge = wrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer');
     const referenceHeight = referenceBadge ? getBaseLineBadgeMetrics(referenceBadge).height : metrics.height;
     const scale = referenceHeight > 0 ? effectiveLineBadgeSize / referenceHeight : 1;
+    const marker = wrapper.closest('.maplibregl-marker');
+    const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
+    const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
 
-    wrapper.style.height = `${metrics.height * scale}px`;
-    wrapper.style.maxHeight = `${metrics.maxHeight * scale}px`;
+    wrapper.style.height = `${metrics.height * scale * hoverScale}px`;
+    wrapper.style.maxHeight = `${metrics.maxHeight * scale * hoverScale}px`;
+    wrapper.style.overflow = '';
+    wrapper.style.transformOrigin = '';
+    wrapper.style.transitionProperty = 'height, max-height';
+    wrapper.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    wrapper.style.transform = '';
   });
 
   lineBadges.forEach((badge) => {
     const effectiveLineBadgeSize = lineBadgeSize * globalScale;
     const metrics = getBaseLineBadgeMetrics(badge);
-    const scale = metrics.height > 0 ? effectiveLineBadgeSize / metrics.height : 1;
+    const marker = badge.closest('.maplibregl-marker');
+    const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
+    const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
+    const scale = metrics.height > 0 ? (effectiveLineBadgeSize * hoverScale) / metrics.height : 1;
 
     badge.style.minWidth = `${metrics.minWidth * scale}px`;
-    badge.style.height = `${effectiveLineBadgeSize}px`;
+    badge.style.height = `${effectiveLineBadgeSize * hoverScale}px`;
     badge.style.fontSize = `${Math.max(8, metrics.fontSize * scale)}px`;
     badge.style.paddingLeft = `${Math.max(0, metrics.paddingLeft * scale)}px`;
     badge.style.paddingRight = `${Math.max(0, metrics.paddingRight * scale)}px`;
+    badge.style.transitionProperty = 'min-width, height, font-size, padding-left, padding-right, color, background-color, border-color, opacity';
+    badge.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
 
     const label = badge.querySelector<HTMLElement>(':scope > span');
     if (label) {
@@ -386,7 +434,22 @@ function applyMarkerAppearance(root: ParentNode): void {
   });
 
   stationNames.forEach((name) => {
-    name.style.fontSize = `${stationNameSize * globalScale}px`;
+    const marker = name.closest('.maplibregl-marker');
+    const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
+    const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
+
+    name.style.fontSize = `${stationNameSize * globalScale * hoverScale}px`;
+    name.style.transformOrigin = '';
+    name.style.transitionProperty = 'font-size';
+    name.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    name.style.transform = '';
+
+    const wrapper = name.closest(STATION_NAME_WRAPPER_SELECTOR);
+    if (!(wrapper instanceof HTMLElement)) return;
+
+    const wrapperMetrics = getBaseStationNameWrapperMetrics(wrapper);
+    wrapper.style.maxWidth = `${wrapperMetrics.maxWidth}px`;
+    wrapper.style.overflow = '';
   });
   isApplyingMarkerAppearance = false;
 }
