@@ -123,6 +123,47 @@ function isMarkerActive(marker: HTMLElement): boolean {
   return marker.matches(':hover') || marker.contains(document.activeElement);
 }
 
+function compareRouteBadgeLabels(left: string, right: string): number {
+  const leftNumber = Number.parseFloat(left);
+  const rightNumber = Number.parseFloat(right);
+  const leftIsNumber = Number.isFinite(leftNumber);
+  const rightIsNumber = Number.isFinite(rightNumber);
+
+  if (leftIsNumber && rightIsNumber) {
+    return leftNumber - rightNumber;
+  }
+
+  if (leftIsNumber) return -1;
+  if (rightIsNumber) return 1;
+
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function sortRouteBadges(root: ParentNode): void {
+  const containers = root.querySelectorAll<HTMLElement>('.maplibregl-marker .flex.gap-0\\.5');
+
+  containers.forEach((container) => {
+    const wrappers = Array.from(container.children).filter((child): child is HTMLElement => {
+      if (!(child instanceof HTMLElement)) return false;
+      return child.classList.contains('relative') && child.querySelector(':scope > .font-mta.cursor-pointer') !== null;
+    });
+
+    if (wrappers.length < 2) return;
+
+    const sortedWrappers = [...wrappers].sort((leftWrapper, rightWrapper) => {
+      const leftLabel = leftWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
+      const rightLabel =
+        rightWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
+
+      return compareRouteBadgeLabels(leftLabel, rightLabel);
+    });
+
+    sortedWrappers.forEach((wrapper) => {
+      container.appendChild(wrapper);
+    });
+  });
+}
+
 function getBaseLineBadgeMetrics(badge: HTMLElement): LineBadgeMetrics {
   const cachedHeight = Number.parseFloat(badge.dataset.stationDotsBaseHeight ?? '');
   const cachedMinWidth = Number.parseFloat(badge.dataset.stationDotsBaseMinWidth ?? '');
@@ -323,6 +364,7 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
 
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
+  sortRouteBadges(root);
   const {
     globalScale,
     normalStationDotSize,
