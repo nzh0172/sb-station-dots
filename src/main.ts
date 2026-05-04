@@ -17,6 +17,7 @@ const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
 const TAG = '[Station Dots]';
 const STATION_DOT_SELECTOR = '.maplibregl-marker .rounded-full.relative.border-\\[1px\\]';
+const LINE_BADGE_ROW_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5';
 const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative:has(> .font-mta.cursor-pointer)';
 const LINE_BADGE_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative > .font-mta.cursor-pointer';
 const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
@@ -204,7 +205,7 @@ function getRouteBadgeShapeOrder(wrapper: HTMLElement): number {
 }
 
 function sortRouteBadges(root: ParentNode, direction: RouteSortDirection, sortByShape: RouteSortByShape): void {
-  const containers = root.querySelectorAll<HTMLElement>('.maplibregl-marker .flex.gap-0\\.5');
+  const containers = root.querySelectorAll<HTMLElement>(LINE_BADGE_ROW_SELECTOR);
 
   containers.forEach((container) => {
     const wrappers = Array.from(container.children).filter((child): child is HTMLElement => {
@@ -451,6 +452,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
+    routeIconWrapWidth,
     routeSortByShape,
     routeSortDirection,
     transferDotColor,
@@ -458,6 +460,7 @@ function applyMarkerAppearance(root: ParentNode): void {
   } = getMarkerAppearance();
   sortRouteBadges(root, routeSortDirection, routeSortByShape);
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
+  const lineBadgeRows = root.querySelectorAll<HTMLElement>(LINE_BADGE_ROW_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);
   const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
@@ -481,6 +484,14 @@ function applyMarkerAppearance(root: ParentNode): void {
       dot.style.borderColor = '';
       dot.style.borderWidth = `${normalStationDotOutlineThickness * globalScale}px`;
     }
+  });
+
+  lineBadgeRows.forEach((row) => {
+    row.style.flexWrap = 'wrap';
+    row.style.alignItems = 'flex-start';
+    row.style.width = `${routeIconWrapWidth * globalScale}px`;
+    row.style.maxWidth = `${routeIconWrapWidth * globalScale}px`;
+    row.style.overflow = 'visible';
   });
 
   lineBadgeWrappers.forEach((wrapper) => {

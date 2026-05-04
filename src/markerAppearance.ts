@@ -11,6 +11,7 @@ export type MarkerAppearanceKey =
   | 'stationNameSize'
   | 'routeSortDirection'
   | 'routeSortByShape'
+  | 'routeIconWrapWidth'
   | 'transferDotColor'
   | 'transferDotOutlineColor';
 
@@ -49,6 +50,7 @@ export type MarkerAppearanceState = {
   stationNameSize: number;
   routeSortDirection: RouteSortDirection;
   routeSortByShape: RouteSortByShape;
+  routeIconWrapWidth: number;
   transferDotColor: string;
   transferDotOutlineColor: string;
 };
@@ -126,6 +128,13 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: 'off',
     storageKey: 'com.author.modname:route-sort-by-shape',
   },
+  routeIconWrapWidth: {
+    defaultValue: 88,
+    min: 44,
+    max: 220,
+    step: 4,
+    storageKey: 'com.author.modname:route-icon-wrap-width-px',
+  },
   transferDotColor: {
     defaultValue: '#ffffff',
     storageKey: 'com.author.modname:transfer-dot-color',
@@ -151,6 +160,7 @@ const state: MarkerAppearanceState = {
   stationNameSize: loadValue('stationNameSize'),
   routeSortDirection: loadValue('routeSortDirection'),
   routeSortByShape: loadValue('routeSortByShape'),
+  routeIconWrapWidth: loadValue('routeIconWrapWidth'),
   transferDotColor: loadValue('transferDotColor'),
   transferDotOutlineColor: loadValue('transferDotOutlineColor'),
 };
@@ -313,6 +323,7 @@ export function resetMarkerAppearance(): void {
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
   state.routeSortByShape = SETTINGS.routeSortByShape.defaultValue as RouteSortByShape;
+  state.routeIconWrapWidth = SETTINGS.routeIconWrapWidth.defaultValue as number;
   state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
   state.transferDotOutlineColor = SETTINGS.transferDotOutlineColor.defaultValue as string;
 
@@ -328,6 +339,7 @@ export function resetMarkerAppearance(): void {
   saveValue('stationNameSize', state.stationNameSize);
   saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('routeSortByShape', state.routeSortByShape);
+  saveValue('routeIconWrapWidth', state.routeIconWrapWidth);
   saveValue('transferDotColor', state.transferDotColor);
   saveValue('transferDotOutlineColor', state.transferDotOutlineColor);
 

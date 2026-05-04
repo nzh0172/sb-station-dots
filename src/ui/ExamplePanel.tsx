@@ -22,6 +22,7 @@ const transferDotOutlineThicknessRange = getMarkerAppearanceRange('transferDotOu
 const lineBadgeRange = getMarkerAppearanceRange('lineBadgeSize');
 const editRouteOrderButtonScaleRange = getMarkerAppearanceRange('editRouteOrderButtonScale');
 const stationNameRange = getMarkerAppearanceRange('stationNameSize');
+const routeIconWrapWidthRange = getMarkerAppearanceRange('routeIconWrapWidth');
 const PANEL_COMPONENT_KEY = '__markerAppearanceToolbarComponent';
 const EMOJI_PRESETS = emojiPresets as Array<{ icon: string; label: string }>;
 const NORMAL_STATION_DOT_SHAPES = [
@@ -281,6 +282,26 @@ export function TransferDotPanel() {
                     />
                   </button>
                 </label>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Route icon wrap width</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.routeIconWrapWidth}px
+                  </div>
+                </div>
+                <input
+                  className="mt-3 w-full accent-primary"
+                  type="range"
+                  min={routeIconWrapWidthRange.min}
+                  max={routeIconWrapWidthRange.max}
+                  step={routeIconWrapWidthRange.step}
+                  value={appearance.routeIconWrapWidth}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('routeIconWrapWidth', Number.parseFloat(event.target.value));
+                  }}
+                />
               </div>
             </div>
 
