@@ -19,6 +19,7 @@ const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duratio
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
 const STATION_NAME_HOVER_SCALE = 1.18;
 const HOVER_ANIMATION_DURATION_MS = 140;
+const HOVER_ANIMATION_EASING = 'ease-out';
 
 const api = window.SubwayBuilderAPI;
 const CLEANUP_KEY = '__markerAppearanceCleanup';
@@ -421,6 +422,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     wrapper.style.transformOrigin = '';
     wrapper.style.transitionProperty = 'height, max-height';
     wrapper.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    wrapper.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     wrapper.style.transform = '';
   });
 
@@ -439,6 +441,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     badge.style.paddingRight = `${Math.max(0, metrics.paddingRight * scale)}px`;
     badge.style.transitionProperty = 'min-width, height, font-size, padding-left, padding-right, color, background-color, border-color, opacity';
     badge.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    badge.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
 
     const label = badge.querySelector<HTMLElement>(':scope > span');
     if (label) {
@@ -484,13 +487,17 @@ function applyMarkerAppearance(root: ParentNode): void {
     name.style.transformOrigin = '';
     name.style.transitionProperty = 'font-size';
     name.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    name.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     name.style.transform = '';
 
     const wrapper = name.closest(STATION_NAME_WRAPPER_SELECTOR);
     if (!(wrapper instanceof HTMLElement)) return;
 
     const wrapperMetrics = getBaseStationNameWrapperMetrics(wrapper);
-    wrapper.style.maxWidth = `${wrapperMetrics.maxWidth}px`;
+    wrapper.style.maxWidth = `${wrapperMetrics.maxWidth * hoverScale}px`;
+    wrapper.style.transitionProperty = 'max-width';
+    wrapper.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
+    wrapper.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     wrapper.style.overflow = '';
   });
   isApplyingMarkerAppearance = false;
@@ -597,14 +604,18 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
   };
 
   document.addEventListener('mouseover', reapplyForInteraction, true);
+  document.addEventListener('mouseout', reapplyForInteraction, true);
   document.addEventListener('focusin', reapplyForInteraction, true);
+  document.addEventListener('focusout', reapplyForInteraction, true);
 
   (window as Window & { [CLEANUP_KEY]?: CleanupHandle })[CLEANUP_KEY] = {
     observer,
     unsubscribe,
     removeInteractionListeners: () => {
       document.removeEventListener('mouseover', reapplyForInteraction, true);
+      document.removeEventListener('mouseout', reapplyForInteraction, true);
       document.removeEventListener('focusin', reapplyForInteraction, true);
+      document.removeEventListener('focusout', reapplyForInteraction, true);
     },
   };
 }
