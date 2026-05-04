@@ -229,7 +229,7 @@ export function TransferDotPanel() {
 
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Route icon (sort by text)</p>
+                  <p className="text-sm font-medium">Sort route icon by text</p>
                   <div className="min-w-14 text-right font-mono text-sm capitalize">
                     {appearance.routeSortDirection}
                   </div>
@@ -258,19 +258,15 @@ export function TransferDotPanel() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Sort by shape</p>
-                  <div className="min-w-14 text-right font-mono text-sm capitalize">
-                    {appearance.routeSortByShape === 'on' ? 'Enabled' : 'Disabled'}
-                  </div>
-                </div>
-                <label className="mt-3 flex cursor-pointer items-center justify-between rounded-md border border-border bg-background px-3 py-2 transition-colors hover:bg-accent">
+                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
                   <span className="text-sm font-medium">Group icons by shape</span>
                   <button
                     aria-checked={appearance.routeSortByShape === 'on'}
                     aria-label="Toggle sort by shape"
-                    className={`relative h-6 w-11 rounded-full transition-colors ${
-                      appearance.routeSortByShape === 'on' ? 'bg-primary' : 'bg-muted'
+                    className={`relative h-6 w-11 rounded-full border transition-colors ${
+                      appearance.routeSortByShape === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
                     }`}
                     role="switch"
                     type="button"
@@ -279,8 +275,8 @@ export function TransferDotPanel() {
                     }}
                   >
                     <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
-                        appearance.routeSortByShape === 'on' ? 'translate-x-5' : 'translate-x-0.5'
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.routeSortByShape === 'on' ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
                   </button>
