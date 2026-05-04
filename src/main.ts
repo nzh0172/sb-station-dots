@@ -5,7 +5,12 @@
 
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
-import { getMarkerAppearance, subscribeMarkerAppearance, type NormalStationDotShape } from './markerAppearance';
+import {
+  getMarkerAppearance,
+  subscribeMarkerAppearance,
+  type NormalStationDotShape,
+  type RouteSortDirection,
+} from './markerAppearance';
 
 const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
@@ -140,7 +145,7 @@ function compareRouteBadgeLabels(left: string, right: string): number {
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-function sortRouteBadges(root: ParentNode): void {
+function sortRouteBadges(root: ParentNode, direction: RouteSortDirection): void {
   const containers = root.querySelectorAll<HTMLElement>('.maplibregl-marker .flex.gap-0\\.5');
 
   containers.forEach((container) => {
@@ -156,7 +161,8 @@ function sortRouteBadges(root: ParentNode): void {
       const rightLabel =
         rightWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
 
-      return compareRouteBadgeLabels(leftLabel, rightLabel);
+      const order = compareRouteBadgeLabels(leftLabel, rightLabel);
+      return direction === 'descending' ? order * -1 : order;
     });
 
     sortedWrappers.forEach((wrapper) => {
@@ -365,7 +371,6 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
 
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
-  sortRouteBadges(root);
   const {
     globalScale,
     normalStationDotSize,
@@ -377,9 +382,11 @@ function applyMarkerAppearance(root: ParentNode): void {
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
+    routeSortDirection,
     transferDotColor,
     transferDotOutlineColor,
   } = getMarkerAppearance();
+  sortRouteBadges(root, routeSortDirection);
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);

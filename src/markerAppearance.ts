@@ -9,15 +9,17 @@ export type MarkerAppearanceKey =
   | 'lineBadgeSize'
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
+  | 'routeSortDirection'
   | 'transferDotColor'
   | 'transferDotOutlineColor';
 
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
-  'normalStationDotShape' | 'transferDotShape' | 'transferDotColor' | 'transferDotOutlineColor'
+  'normalStationDotShape' | 'transferDotShape' | 'routeSortDirection' | 'transferDotColor' | 'transferDotOutlineColor'
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
+export type RouteSortDirection = 'ascending' | 'descending';
 
 type MarkerAppearanceSetting = {
   defaultValue: number | string;
@@ -38,6 +40,7 @@ export type MarkerAppearanceState = {
   lineBadgeSize: number;
   editRouteOrderButtonScale: number;
   stationNameSize: number;
+  routeSortDirection: RouteSortDirection;
   transferDotColor: string;
   transferDotOutlineColor: string;
 };
@@ -107,6 +110,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 1,
     storageKey: 'com.author.modname:station-name-size-px',
   },
+  routeSortDirection: {
+    defaultValue: 'ascending',
+    storageKey: 'com.author.modname:route-sort-direction',
+  },
   transferDotColor: {
     defaultValue: '#ffffff',
     storageKey: 'com.author.modname:transfer-dot-color',
@@ -130,6 +137,7 @@ const state: MarkerAppearanceState = {
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
+  routeSortDirection: loadValue('routeSortDirection'),
   transferDotColor: loadValue('transferDotColor'),
   transferDotOutlineColor: loadValue('transferDotOutlineColor'),
 };
@@ -162,12 +170,20 @@ function normalizeStationDotShape(value: string): NormalStationDotShape {
   }
 }
 
+function normalizeRouteSortDirection(value: string): RouteSortDirection {
+  return value.trim().toLowerCase() === 'descending' ? 'descending' : 'ascending';
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
 
   if (key === 'normalStationDotShape' || key === 'transferDotShape') {
     return normalizeStationDotShape(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'routeSortDirection') {
+    return normalizeRouteSortDirection(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (typeof setting.defaultValue === 'string') {
@@ -236,6 +252,16 @@ export function setMarkerAppearanceShape(key: 'normalStationDotShape' | 'transfe
   emit();
 }
 
+export function setRouteSortDirection(value: string): void {
+  const nextValue = normalizeRouteSortDirection(value);
+
+  if (nextValue === state.routeSortDirection) return;
+
+  state.routeSortDirection = nextValue;
+  saveValue('routeSortDirection', nextValue);
+  emit();
+}
+
 export function resetMarkerAppearance(): void {
   state.globalScale = SETTINGS.globalScale.defaultValue as number;
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
@@ -247,6 +273,7 @@ export function resetMarkerAppearance(): void {
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
+  state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
   state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
   state.transferDotOutlineColor = SETTINGS.transferDotOutlineColor.defaultValue as string;
 
@@ -260,6 +287,7 @@ export function resetMarkerAppearance(): void {
   saveValue('lineBadgeSize', state.lineBadgeSize);
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
+  saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('transferDotColor', state.transferDotColor);
   saveValue('transferDotOutlineColor', state.transferDotOutlineColor);
 

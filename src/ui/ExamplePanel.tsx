@@ -4,6 +4,7 @@ import {
   getMarkerAppearance,
   getMarkerAppearanceRange,
   resetMarkerAppearance,
+  setRouteSortDirection,
   setMarkerAppearanceColor,
   setMarkerAppearanceShape,
   setMarkerAppearanceValue,
@@ -26,6 +27,10 @@ const NORMAL_STATION_DOT_SHAPES = [
   { label: 'Circle', value: 'circle' },
   { label: 'Square', value: 'square' },
   { label: 'Diamond', value: 'diamond' },
+] as const;
+const ROUTE_SORT_DIRECTIONS = [
+  { label: 'Ascending', value: 'ascending' },
+  { label: 'Descending', value: 'descending' },
 ] as const;
 
 async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
@@ -219,6 +224,36 @@ export function TransferDotPanel() {
                     setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
                   }}
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Route sort</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.routeSortDirection}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {ROUTE_SORT_DIRECTIONS.map((direction) => {
+                    const isActive = appearance.routeSortDirection === direction.value;
+                    return (
+                      <button
+                        key={direction.value}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-background hover:bg-accent'
+                        }`}
+                        type="button"
+                        onClick={() => {
+                          setRouteSortDirection(direction.value);
+                        }}
+                      >
+                        {direction.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
