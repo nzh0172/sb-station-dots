@@ -479,12 +479,8 @@ function isTransferDot(dot: HTMLElement): boolean {
 }
 
 function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
-  const cachedKind = dot.dataset.stationDotsKind;
-  if (cachedKind === 'transfer' || cachedKind === 'station') {
-    return cachedKind;
-  }
-
   if (!isStationMarkerDot(dot)) {
+    delete dot.dataset.stationDotsKind;
     return null;
   }
 
@@ -644,9 +640,13 @@ function applyMarkerAppearance(root: ParentNode): void {
     const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
     const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
     const dot = marker?.querySelector<HTMLElement>(STATION_DOT_SELECTOR);
+    const currentName = normalizeLabelText(name.textContent ?? '');
+    const lastAppliedName = name.dataset.stationDotsAppliedName;
 
     if (name.dataset.stationDotsBaseName === undefined) {
-      name.dataset.stationDotsBaseName = normalizeLabelText(name.textContent ?? '');
+      name.dataset.stationDotsBaseName = currentName;
+    } else if (currentName.length > 0 && currentName !== lastAppliedName) {
+      name.dataset.stationDotsBaseName = currentName;
     }
 
     const baseName = name.dataset.stationDotsBaseName;
@@ -658,6 +658,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     if (name.textContent !== displayName) {
       name.textContent = displayName;
     }
+    name.dataset.stationDotsAppliedName = displayName;
 
     name.style.fontSize = `${stationNameSize * globalScale * hoverScale}px`;
     name.style.transformOrigin = '';
@@ -721,6 +722,15 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
     if (isApplyingMarkerAppearance) return;
 
     for (const mutation of mutations) {
+      if (mutation.type === 'characterData') {
+        const parentElement = mutation.target.parentElement;
+        const marker = parentElement?.closest('.maplibregl-marker');
+        if (marker instanceof HTMLElement) {
+          scheduleMarkerRefresh(marker);
+        }
+        continue;
+      }
+
       if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
         const marker = mutation.target.closest('.maplibregl-marker');
         if (marker instanceof HTMLElement) {
@@ -756,6 +766,7 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    characterData: true,
     attributes: true,
     attributeFilter: ['style', 'class'],
   });
