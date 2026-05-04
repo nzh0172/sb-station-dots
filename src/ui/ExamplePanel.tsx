@@ -4,6 +4,7 @@ import {
   getMarkerAppearance,
   getMarkerAppearanceRange,
   resetMarkerAppearance,
+  setRouteSortByShape,
   setRouteSortDirection,
   setMarkerAppearanceColor,
   setMarkerAppearanceShape,
@@ -33,7 +34,6 @@ const ROUTE_SORT_DIRECTIONS = [
   { label: 'Ascending', value: 'ascending' },
   { label: 'Descending', value: 'descending' },
 ] as const;
-
 async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(value);
@@ -229,7 +229,7 @@ export function TransferDotPanel() {
 
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Route icon (Sort by text)</p>
+                  <p className="text-sm font-medium">Route icon (sort by text)</p>
                   <div className="min-w-14 text-right font-mono text-sm capitalize">
                     {appearance.routeSortDirection}
                   </div>
@@ -255,6 +255,36 @@ export function TransferDotPanel() {
                     );
                   })}
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Sort by shape</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.routeSortByShape === 'on' ? 'Enabled' : 'Disabled'}
+                  </div>
+                </div>
+                <label className="mt-3 flex cursor-pointer items-center justify-between rounded-md border border-border bg-background px-3 py-2 transition-colors hover:bg-accent">
+                  <span className="text-sm font-medium">Group icons by shape</span>
+                  <button
+                    aria-checked={appearance.routeSortByShape === 'on'}
+                    aria-label="Toggle sort by shape"
+                    className={`relative h-6 w-11 rounded-full transition-colors ${
+                      appearance.routeSortByShape === 'on' ? 'bg-primary' : 'bg-muted'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setRouteSortByShape(appearance.routeSortByShape === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.routeSortByShape === 'on' ? 'translate-x-5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </label>
               </div>
             </div>
 

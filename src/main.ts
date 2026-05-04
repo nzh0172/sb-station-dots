@@ -9,6 +9,7 @@ import {
   getMarkerAppearance,
   subscribeMarkerAppearance,
   type NormalStationDotShape,
+  type RouteSortByShape,
   type RouteSortDirection,
 } from './markerAppearance';
 
@@ -155,7 +156,54 @@ function getOriginalRouteBadgeOrder(wrapper: HTMLElement, fallbackIndex: number)
   return fallbackIndex;
 }
 
-function sortRouteBadges(root: ParentNode, direction: RouteSortDirection): void {
+function getRouteBadgeLabel(wrapper: HTMLElement): string {
+  return wrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
+}
+
+function getRouteBadgeShapeName(wrapper: HTMLElement): 'circle' | 'square' | 'diamond' | 'other' {
+  const badge = wrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer');
+  if (!(badge instanceof HTMLElement)) return 'other';
+
+  const computedStyle = getComputedStyle(badge);
+  const inlineTransform = badge.style.transform.toLowerCase();
+  const computedTransform = computedStyle.transform.toLowerCase();
+  const clipPath = `${badge.style.clipPath} ${computedStyle.clipPath}`.toLowerCase();
+  if (inlineTransform.includes('rotate(45deg)') || computedTransform !== 'none' || clipPath.includes('polygon')) {
+    return 'diamond';
+  }
+
+  const metrics = getBaseLineBadgeMetrics(badge);
+  if (metrics.height <= 0) return 'other';
+
+  const widthHeightRatio = metrics.minWidth / metrics.height;
+  const borderRadius = parsePixelValue(badge.style.borderRadius || computedStyle.borderRadius) ?? 0;
+  const isCircle = borderRadius >= metrics.height / 2 - 0.5;
+  const isPill = borderRadius >= metrics.height / 2 - 0.5 && widthHeightRatio > 1.1;
+  if (isCircle && !isPill) {
+    return 'circle';
+  }
+
+  if (widthHeightRatio <= 1.1) {
+    return 'square';
+  }
+
+  return 'square';
+}
+
+function getRouteBadgeShapeOrder(wrapper: HTMLElement): number {
+  switch (getRouteBadgeShapeName(wrapper)) {
+    case 'circle':
+      return 0;
+    case 'square':
+      return 1;
+    case 'diamond':
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function sortRouteBadges(root: ParentNode, direction: RouteSortDirection, sortByShape: RouteSortByShape): void {
   const containers = root.querySelectorAll<HTMLElement>('.maplibregl-marker .flex.gap-0\\.5');
 
   containers.forEach((container) => {
@@ -175,11 +223,14 @@ function sortRouteBadges(root: ParentNode, direction: RouteSortDirection): void 
         return getOriginalRouteBadgeOrder(leftWrapper, 0) - getOriginalRouteBadgeOrder(rightWrapper, 0);
       }
 
-      const leftLabel = leftWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
-      const rightLabel =
-        rightWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
+      const leftLabel = getRouteBadgeLabel(leftWrapper);
+      const rightLabel = getRouteBadgeLabel(rightWrapper);
 
-      const order = compareRouteBadgeLabels(leftLabel, rightLabel);
+      const order =
+        sortByShape === 'on'
+          ? getRouteBadgeShapeOrder(leftWrapper) - getRouteBadgeShapeOrder(rightWrapper) ||
+            compareRouteBadgeLabels(leftLabel, rightLabel)
+          : compareRouteBadgeLabels(leftLabel, rightLabel);
       return direction === 'descending' ? order * -1 : order;
     });
 
@@ -400,11 +451,12 @@ function applyMarkerAppearance(root: ParentNode): void {
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
+    routeSortByShape,
     routeSortDirection,
     transferDotColor,
     transferDotOutlineColor,
   } = getMarkerAppearance();
-  sortRouteBadges(root, routeSortDirection);
+  sortRouteBadges(root, routeSortDirection, routeSortByShape);
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);

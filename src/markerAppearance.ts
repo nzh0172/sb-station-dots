@@ -10,16 +10,23 @@ export type MarkerAppearanceKey =
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
   | 'routeSortDirection'
+  | 'routeSortByShape'
   | 'transferDotColor'
   | 'transferDotOutlineColor';
 
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
-  'normalStationDotShape' | 'transferDotShape' | 'routeSortDirection' | 'transferDotColor' | 'transferDotOutlineColor'
+  | 'normalStationDotShape'
+  | 'transferDotShape'
+  | 'routeSortDirection'
+  | 'routeSortByShape'
+  | 'transferDotColor'
+  | 'transferDotOutlineColor'
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
+export type RouteSortByShape = 'off' | 'on';
 
 type MarkerAppearanceSetting = {
   defaultValue: number | string;
@@ -41,6 +48,7 @@ export type MarkerAppearanceState = {
   editRouteOrderButtonScale: number;
   stationNameSize: number;
   routeSortDirection: RouteSortDirection;
+  routeSortByShape: RouteSortByShape;
   transferDotColor: string;
   transferDotOutlineColor: string;
 };
@@ -114,6 +122,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: 'original',
     storageKey: 'com.author.modname:route-sort-direction',
   },
+  routeSortByShape: {
+    defaultValue: 'off',
+    storageKey: 'com.author.modname:route-sort-by-shape',
+  },
   transferDotColor: {
     defaultValue: '#ffffff',
     storageKey: 'com.author.modname:transfer-dot-color',
@@ -138,6 +150,7 @@ const state: MarkerAppearanceState = {
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
   routeSortDirection: loadValue('routeSortDirection'),
+  routeSortByShape: loadValue('routeSortByShape'),
   transferDotColor: loadValue('transferDotColor'),
   transferDotOutlineColor: loadValue('transferDotOutlineColor'),
 };
@@ -181,6 +194,10 @@ function normalizeRouteSortDirection(value: string): RouteSortDirection {
   }
 }
 
+function normalizeRouteSortByShape(value: string): RouteSortByShape {
+  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
@@ -191,6 +208,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'routeSortDirection') {
     return normalizeRouteSortDirection(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'routeSortByShape') {
+    return normalizeRouteSortByShape(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (typeof setting.defaultValue === 'string') {
@@ -269,6 +290,16 @@ export function setRouteSortDirection(value: string): void {
   emit();
 }
 
+export function setRouteSortByShape(value: string): void {
+  const nextValue = normalizeRouteSortByShape(value);
+
+  if (nextValue === state.routeSortByShape) return;
+
+  state.routeSortByShape = nextValue;
+  saveValue('routeSortByShape', nextValue);
+  emit();
+}
+
 export function resetMarkerAppearance(): void {
   state.globalScale = SETTINGS.globalScale.defaultValue as number;
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
@@ -281,6 +312,7 @@ export function resetMarkerAppearance(): void {
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
+  state.routeSortByShape = SETTINGS.routeSortByShape.defaultValue as RouteSortByShape;
   state.transferDotColor = SETTINGS.transferDotColor.defaultValue as string;
   state.transferDotOutlineColor = SETTINGS.transferDotOutlineColor.defaultValue as string;
 
@@ -295,6 +327,7 @@ export function resetMarkerAppearance(): void {
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
   saveValue('routeSortDirection', state.routeSortDirection);
+  saveValue('routeSortByShape', state.routeSortByShape);
   saveValue('transferDotColor', state.transferDotColor);
   saveValue('transferDotOutlineColor', state.transferDotOutlineColor);
 
