@@ -13,6 +13,7 @@ import type {
   CompletedCommute,
   StationRidership,
   RouteRidership,
+  StationGroup,
 } from './game-state';
 import type { GameConstants } from './game-constants';
 import type { Bond, BondType, BondResult } from './game-actions';
@@ -412,6 +413,12 @@ export interface ModdingAPI {
     getModeChoiceStats(): ModeChoiceStats;
     /** Get all completed commutes in the current time window. */
     getCompletedCommutes(): CompletedCommute[];
+    /** Get all transfer/station groups. */
+    getStationGroups(): StationGroup[];
+    /** Get station IDs that belong to transfer groups with 2+ stations. */
+    getTransferStationIds(): string[];
+    /** Get sibling station IDs in the same station group for a given station. */
+    getSiblingStationIds(stationId: string): string[];
     /** Get ridership for a specific station, or aggregate station ridership if no ID is given. */
     getStationRidership(stationId?: string | null): StationRidership;
     /** Get ridership broken down by station for a specific route. */

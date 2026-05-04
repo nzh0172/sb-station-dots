@@ -4,6 +4,7 @@ import {
   getMarkerAppearance,
   getMarkerAppearanceRange,
   resetMarkerAppearance,
+  setJoinTransferNames,
   setRouteSortByShape,
   setRouteSortDirection,
   setMarkerAppearanceColor,
@@ -226,6 +227,32 @@ export function TransferDotPanel() {
                     setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
                   }}
                 />
+              </div>
+
+              <div>
+                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
+                  <span className="pr-3 text-sm font-medium">Join distinct station group names with slash '/'</span>
+                  <button
+                    aria-checked={appearance.joinTransferNames === 'on'}
+                    aria-label="Toggle joined transfer station names"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.joinTransferNames === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setJoinTransferNames(appearance.joinTransferNames === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.joinTransferNames === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
               </div>
 
               <div>

@@ -8,6 +8,7 @@ import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent
 import {
   getMarkerAppearance,
   subscribeMarkerAppearance,
+  type JoinTransferNames,
   type NormalStationDotShape,
   type RouteSortByShape,
   type RouteSortDirection,
@@ -72,6 +73,11 @@ type StationNameWrapperMetrics = {
   maxWidth: number;
 };
 
+type TransferStationGroup = {
+  names: string[];
+  routeBullets: string[];
+};
+
 function parsePixelValue(value: string | null | undefined): number | null {
   if (!value) return null;
 
@@ -129,6 +135,72 @@ function scalePixelTransforms(value: string, scale: number): string {
 
 function isMarkerActive(marker: HTMLElement): boolean {
   return marker.matches(':hover') || marker.contains(document.activeElement);
+}
+
+function normalizeLabelText(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function buildTransferStationGroups(): TransferStationGroup[] {
+  if (!api?.gameState) return [];
+
+  const stations = api.gameState.getStations();
+  const stationGroups = api.gameState.getStationGroups();
+  const routes = api.gameState.getRoutes();
+  const stationById = new Map(stations.map((station) => [station.id, station]));
+  const routeBulletById = new Map(
+    routes.map((route) => [route.id, normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '')]),
+  );
+  return stationGroups
+    .map((group) => {
+      const groupStations = group.stationIds
+        .map((stationId) => stationById.get(stationId))
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
+
+      const names = Array.from(
+        new Set(groupStations.map((entry) => normalizeLabelText(entry.name)).filter((entry) => entry.length > 0)),
+      );
+
+      const routeBullets = Array.from(
+        new Set(
+          groupStations
+            .flatMap((entry) => entry.routeIds)
+            .map((routeId) => routeBulletById.get(routeId) ?? '')
+            .filter((entry) => entry.length > 0),
+        ),
+      ).sort((left, right) => compareRouteBadgeLabels(left, right));
+
+      return { names, routeBullets };
+    })
+    .filter((group) => group.names.length > 1 && group.routeBullets.length > 0);
+}
+
+function arraysMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function getMarkerRouteBadgeLabels(marker: HTMLElement): string[] {
+  return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
+    .map((badge) => normalizeLabelText(badge.textContent ?? ''))
+    .filter((label) => label.length > 0)
+    .sort((left, right) => compareRouteBadgeLabels(left, right));
+}
+
+function getTransferStationLabel(marker: HTMLElement, fallbackName: string, joinTransferNames: JoinTransferNames): string {
+  const normalizedFallbackName = normalizeLabelText(fallbackName);
+  if (joinTransferNames !== 'on') return normalizedFallbackName;
+
+  const routeBullets = getMarkerRouteBadgeLabels(marker);
+  if (routeBullets.length === 0) return normalizedFallbackName;
+
+  const matchingGroup = buildTransferStationGroups().find((group) => {
+    return arraysMatch(group.routeBullets, routeBullets) && group.names.includes(normalizedFallbackName);
+  });
+
+  if (!matchingGroup) return normalizedFallbackName;
+
+  return matchingGroup.names.join('/');
 }
 
 function compareRouteBadgeLabels(left: string, right: string): number {
@@ -452,6 +524,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
+    joinTransferNames,
     routeIconWrapWidth,
     routeSortByShape,
     routeSortDirection,
@@ -570,6 +643,21 @@ function applyMarkerAppearance(root: ParentNode): void {
     const marker = name.closest('.maplibregl-marker');
     const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
     const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
+    const dot = marker?.querySelector<HTMLElement>(STATION_DOT_SELECTOR);
+
+    if (name.dataset.stationDotsBaseName === undefined) {
+      name.dataset.stationDotsBaseName = normalizeLabelText(name.textContent ?? '');
+    }
+
+    const baseName = name.dataset.stationDotsBaseName;
+    const displayName =
+      marker instanceof HTMLElement && dot instanceof HTMLElement && getDotKind(dot) === 'transfer'
+        ? getTransferStationLabel(marker, baseName, joinTransferNames)
+        : baseName;
+
+    if (name.textContent !== displayName) {
+      name.textContent = displayName;
+    }
 
     name.style.fontSize = `${stationNameSize * globalScale * hoverScale}px`;
     name.style.transformOrigin = '';

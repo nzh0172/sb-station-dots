@@ -9,6 +9,7 @@ export type MarkerAppearanceKey =
   | 'lineBadgeSize'
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
+  | 'joinTransferNames'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'routeIconWrapWidth'
@@ -19,6 +20,7 @@ type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
   | 'normalStationDotShape'
   | 'transferDotShape'
+  | 'joinTransferNames'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'transferDotColor'
@@ -26,6 +28,7 @@ type NumericMarkerAppearanceKey = Exclude<
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
+export type JoinTransferNames = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
 
@@ -48,6 +51,7 @@ export type MarkerAppearanceState = {
   lineBadgeSize: number;
   editRouteOrderButtonScale: number;
   stationNameSize: number;
+  joinTransferNames: JoinTransferNames;
   routeSortDirection: RouteSortDirection;
   routeSortByShape: RouteSortByShape;
   routeIconWrapWidth: number;
@@ -120,6 +124,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 1,
     storageKey: 'com.author.modname:station-name-size-px',
   },
+  joinTransferNames: {
+    defaultValue: 'off',
+    storageKey: 'com.author.modname:join-transfer-names',
+  },
   routeSortDirection: {
     defaultValue: 'original',
     storageKey: 'com.author.modname:route-sort-direction',
@@ -158,6 +166,7 @@ const state: MarkerAppearanceState = {
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
+  joinTransferNames: loadValue('joinTransferNames'),
   routeSortDirection: loadValue('routeSortDirection'),
   routeSortByShape: loadValue('routeSortByShape'),
   routeIconWrapWidth: loadValue('routeIconWrapWidth'),
@@ -208,12 +217,20 @@ function normalizeRouteSortByShape(value: string): RouteSortByShape {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeJoinTransferNames(value: string): JoinTransferNames {
+  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
 
   if (key === 'normalStationDotShape' || key === 'transferDotShape') {
     return normalizeStationDotShape(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'joinTransferNames') {
+    return normalizeJoinTransferNames(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'routeSortDirection') {
@@ -300,6 +317,16 @@ export function setRouteSortDirection(value: string): void {
   emit();
 }
 
+export function setJoinTransferNames(value: string): void {
+  const nextValue = normalizeJoinTransferNames(value);
+
+  if (nextValue === state.joinTransferNames) return;
+
+  state.joinTransferNames = nextValue;
+  saveValue('joinTransferNames', nextValue);
+  emit();
+}
+
 export function setRouteSortByShape(value: string): void {
   const nextValue = normalizeRouteSortByShape(value);
 
@@ -321,6 +348,7 @@ export function resetMarkerAppearance(): void {
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
+  state.joinTransferNames = SETTINGS.joinTransferNames.defaultValue as JoinTransferNames;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
   state.routeSortByShape = SETTINGS.routeSortByShape.defaultValue as RouteSortByShape;
   state.routeIconWrapWidth = SETTINGS.routeIconWrapWidth.defaultValue as number;
@@ -337,6 +365,7 @@ export function resetMarkerAppearance(): void {
   saveValue('lineBadgeSize', state.lineBadgeSize);
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
+  saveValue('joinTransferNames', state.joinTransferNames);
   saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('routeSortByShape', state.routeSortByShape);
   saveValue('routeIconWrapWidth', state.routeIconWrapWidth);

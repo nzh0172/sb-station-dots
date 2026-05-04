@@ -257,3 +257,25 @@ export interface TransitPath {
   toStopCoords: Coordinate;
   toStopId: string;
 }
+
+// =============================================================================
+// STATION GROUPS
+// =============================================================================
+
+export interface StationGroup {
+  /** Unique group identifier */
+  id: string;
+  /** Display name (usually the primary station name) */
+  name: string;
+  /** Station IDs in this group */
+  stationIds: string[];
+  /** Center point [longitude, latitude] */
+  center: [number, number];
+  /** Geographic bounds of the group */
+  bounds: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
+}
