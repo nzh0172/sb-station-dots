@@ -145,6 +145,16 @@ function compareRouteBadgeLabels(left: string, right: string): number {
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
 }
 
+function getOriginalRouteBadgeOrder(wrapper: HTMLElement, fallbackIndex: number): number {
+  const cachedOrder = Number.parseInt(wrapper.dataset.stationDotsOriginalOrder ?? '', 10);
+  if (Number.isFinite(cachedOrder)) {
+    return cachedOrder;
+  }
+
+  wrapper.dataset.stationDotsOriginalOrder = String(fallbackIndex);
+  return fallbackIndex;
+}
+
 function sortRouteBadges(root: ParentNode, direction: RouteSortDirection): void {
   const containers = root.querySelectorAll<HTMLElement>('.maplibregl-marker .flex.gap-0\\.5');
 
@@ -156,7 +166,15 @@ function sortRouteBadges(root: ParentNode, direction: RouteSortDirection): void 
 
     if (wrappers.length < 2) return;
 
+    wrappers.forEach((wrapper, index) => {
+      getOriginalRouteBadgeOrder(wrapper, index);
+    });
+
     const sortedWrappers = [...wrappers].sort((leftWrapper, rightWrapper) => {
+      if (direction === 'original') {
+        return getOriginalRouteBadgeOrder(leftWrapper, 0) - getOriginalRouteBadgeOrder(rightWrapper, 0);
+      }
+
       const leftLabel = leftWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';
       const rightLabel =
         rightWrapper.querySelector<HTMLElement>(':scope > .font-mta.cursor-pointer > span')?.textContent?.trim() ?? '';

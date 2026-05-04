@@ -29,6 +29,7 @@ const NORMAL_STATION_DOT_SHAPES = [
   { label: 'Diamond', value: 'diamond' },
 ] as const;
 const ROUTE_SORT_DIRECTIONS = [
+  { label: 'Original', value: 'original' },
   { label: 'Ascending', value: 'ascending' },
   { label: 'Descending', value: 'descending' },
 ] as const;
@@ -228,12 +229,12 @@ export function TransferDotPanel() {
 
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Route sort</p>
+                  <p className="text-sm font-medium">Route icon (Sort by text)</p>
                   <div className="min-w-14 text-right font-mono text-sm capitalize">
                     {appearance.routeSortDirection}
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   {ROUTE_SORT_DIRECTIONS.map((direction) => {
                     const isActive = appearance.routeSortDirection === direction.value;
                     return (

@@ -19,7 +19,7 @@ type NumericMarkerAppearanceKey = Exclude<
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
-export type RouteSortDirection = 'ascending' | 'descending';
+export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 
 type MarkerAppearanceSetting = {
   defaultValue: number | string;
@@ -111,7 +111,7 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     storageKey: 'com.author.modname:station-name-size-px',
   },
   routeSortDirection: {
-    defaultValue: 'ascending',
+    defaultValue: 'original',
     storageKey: 'com.author.modname:route-sort-direction',
   },
   transferDotColor: {
@@ -171,7 +171,14 @@ function normalizeStationDotShape(value: string): NormalStationDotShape {
 }
 
 function normalizeRouteSortDirection(value: string): RouteSortDirection {
-  return value.trim().toLowerCase() === 'descending' ? 'descending' : 'ascending';
+  switch (value.trim().toLowerCase()) {
+    case 'ascending':
+      return 'ascending';
+    case 'descending':
+      return 'descending';
+    default:
+      return 'original';
+  }
 }
 
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
