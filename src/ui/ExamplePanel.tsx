@@ -5,6 +5,7 @@ import {
   getMarkerAppearanceRange,
   resetMarkerAppearance,
   setJoinTransferNames,
+  setPreserveJoinedTransferNamesOnZoomOut,
   setRouteSortByShape,
   setRouteSortDirection,
   setMarkerAppearanceColor,
@@ -249,6 +250,34 @@ export function TransferDotPanel() {
                     <span
                       className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
                         appearance.joinTransferNames === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+              <div>
+                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
+                  <span className="pr-3 text-sm font-medium">Preserve joined station names on zoom out</span>
+                  <button
+                    aria-checked={appearance.preserveJoinedTransferNamesOnZoomOut === 'on'}
+                    aria-label="Toggle preserving joined transfer names on zoom out"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.preserveJoinedTransferNamesOnZoomOut === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setPreserveJoinedTransferNamesOnZoomOut(
+                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'off' : 'on',
+                      );
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'translate-x-5' : 'translate-x-0'
                       }`}
                     />
                   </button>

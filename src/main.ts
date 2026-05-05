@@ -10,6 +10,7 @@ import {
   subscribeMarkerAppearance,
   type JoinTransferNames,
   type NormalStationDotShape,
+  type PreserveJoinedTransferNamesOnZoomOut,
   type RouteSortByShape,
   type RouteSortDirection,
 } from './markerAppearance';
@@ -37,9 +38,12 @@ type CleanupHandle = {
   observer?: MutationObserver;
   unsubscribe?: () => void;
   removeInteractionListeners?: () => void;
+  removeMapListeners?: () => void;
 };
 
 let isApplyingMarkerAppearance = false;
+let currentMapZoom = Number.NaN;
+let previousMapZoom = Number.NaN;
 
 type LineBadgeMetrics = {
   height: number;
@@ -187,9 +191,16 @@ function getMarkerRouteBadgeLabels(marker: HTMLElement): string[] {
     .sort((left, right) => compareRouteBadgeLabels(left, right));
 }
 
-function getTransferStationLabel(marker: HTMLElement, fallbackName: string, joinTransferNames: JoinTransferNames): string {
+function getTransferStationLabel(
+  marker: HTMLElement,
+  fallbackName: string,
+  joinTransferNames: JoinTransferNames,
+  preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut,
+  dotKind: 'transfer' | 'station' | null,
+): string {
   const normalizedFallbackName = normalizeLabelText(fallbackName);
   if (joinTransferNames !== 'on') return normalizedFallbackName;
+  if (preserveJoinedTransferNamesOnZoomOut !== 'on' && dotKind !== 'transfer') return normalizedFallbackName;
 
   const routeBullets = getMarkerRouteBadgeLabels(marker);
   if (routeBullets.length === 0) return normalizedFallbackName;
@@ -521,6 +532,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     editRouteOrderButtonScale,
     stationNameSize,
     joinTransferNames,
+    preserveJoinedTransferNamesOnZoomOut,
     routeIconWrapWidth,
     routeSortByShape,
     routeSortDirection,
@@ -640,6 +652,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
     const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
     const dot = marker?.querySelector<HTMLElement>(STATION_DOT_SELECTOR);
+    const dotKind = dot instanceof HTMLElement ? getDotKind(dot) : null;
     const currentName = normalizeLabelText(name.textContent ?? '');
     const lastAppliedName = name.dataset.stationDotsAppliedName;
 
@@ -650,10 +663,35 @@ function applyMarkerAppearance(root: ParentNode): void {
     }
 
     const baseName = name.dataset.stationDotsBaseName;
-    const displayName =
-      marker instanceof HTMLElement && dot instanceof HTMLElement && getDotKind(dot) === 'transfer'
-        ? getTransferStationLabel(marker, baseName, joinTransferNames)
+    const resolvedJoinedName =
+      marker instanceof HTMLElement
+        ? getTransferStationLabel(
+            marker,
+            baseName,
+            joinTransferNames,
+            preserveJoinedTransferNamesOnZoomOut,
+            dotKind,
+          )
         : baseName;
+
+    if (marker instanceof HTMLElement && resolvedJoinedName !== baseName) {
+      marker.dataset.stationDotsJoinedName = resolvedJoinedName;
+      marker.dataset.stationDotsJoinedNameZoom = String(currentMapZoom);
+    }
+
+    const cachedJoinedName = marker instanceof HTMLElement ? marker.dataset.stationDotsJoinedName ?? '' : '';
+    const cachedJoinedNameZoom = marker instanceof HTMLElement
+      ? Number.parseFloat(marker.dataset.stationDotsJoinedNameZoom ?? '')
+      : Number.NaN;
+    const shouldUseCachedJoinedName =
+      preserveJoinedTransferNamesOnZoomOut === 'on' &&
+      cachedJoinedName.length > 0 &&
+      Number.isFinite(cachedJoinedNameZoom) &&
+      Number.isFinite(currentMapZoom) &&
+      currentMapZoom <= cachedJoinedNameZoom;
+
+    const displayName =
+      resolvedJoinedName !== baseName ? resolvedJoinedName : shouldUseCachedJoinedName ? cachedJoinedName : baseName;
 
     if (name.textContent !== displayName) {
       name.textContent = displayName;
@@ -700,6 +738,8 @@ function hasMarkerAppearanceToolbarButton(): boolean {
 
 function installMarkerAppearanceController(map: MapLibreMap): void {
   cleanupPreviousInstall();
+  currentMapZoom = map.getZoom();
+  previousMapZoom = currentMapZoom;
   applyMarkerAppearance(document);
   const pendingMarkers = new Set<HTMLElement>();
   let flushScheduled = false;
@@ -795,6 +835,18 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
   document.addEventListener('focusin', reapplyForInteraction, true);
   document.addEventListener('focusout', reapplyForInteraction, true);
 
+  const handleZoomStart = () => {
+    previousMapZoom = currentMapZoom;
+  };
+
+  const handleZoomEnd = () => {
+    currentMapZoom = map.getZoom();
+    applyMarkerAppearance(document);
+  };
+
+  map.on('zoomstart', handleZoomStart);
+  map.on('zoomend', handleZoomEnd);
+
   (window as Window & { [CLEANUP_KEY]?: CleanupHandle })[CLEANUP_KEY] = {
     observer,
     unsubscribe,
@@ -803,6 +855,10 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
       document.removeEventListener('mouseout', reapplyForInteraction, true);
       document.removeEventListener('focusin', reapplyForInteraction, true);
       document.removeEventListener('focusout', reapplyForInteraction, true);
+    },
+    removeMapListeners: () => {
+      map.off('zoomstart', handleZoomStart);
+      map.off('zoomend', handleZoomEnd);
     },
   };
 }
