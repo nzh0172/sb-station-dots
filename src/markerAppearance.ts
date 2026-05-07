@@ -337,10 +337,17 @@ export function setRouteSortDirection(value: string): void {
 export function setJoinTransferNames(value: string): void {
   const nextValue = normalizeJoinTransferNames(value);
 
-  if (nextValue === state.joinTransferNames) return;
+  const shouldResetPreserve = nextValue === 'off' && state.preserveJoinedTransferNamesOnZoomOut !== 'off';
+  if (nextValue === state.joinTransferNames && !shouldResetPreserve) return;
 
   state.joinTransferNames = nextValue;
   saveValue('joinTransferNames', nextValue);
+
+  if (nextValue === 'off') {
+    state.preserveJoinedTransferNamesOnZoomOut = 'off';
+    saveValue('preserveJoinedTransferNamesOnZoomOut', state.preserveJoinedTransferNamesOnZoomOut);
+  }
+
   emit();
 }
 

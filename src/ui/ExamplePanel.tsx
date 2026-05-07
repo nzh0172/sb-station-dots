@@ -37,6 +37,13 @@ const ROUTE_SORT_DIRECTIONS = [
   { label: 'Ascending', value: 'ascending' },
   { label: 'Descending', value: 'descending' },
 ] as const;
+const PANEL_CARD_CLASS = 'rounded-xl border-2 border-border bg-background/40 p-4';
+const PANEL_CARD_STRETCH_CLASS = `h-full ${PANEL_CARD_CLASS}`;
+const PANEL_CARD_HEADER_CLASS = 'mb-4 flex items-center justify-between gap-3';
+const PANEL_FIELD_CLASS = 'flex flex-col gap-2';
+const PANEL_FIELD_ROW_CLASS = 'flex items-center justify-between gap-3';
+const PANEL_SWITCH_ROW_CLASS = 'flex cursor-pointer items-center justify-between gap-3 transition-colors hover:bg-accent';
+
 async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(value);
@@ -56,10 +63,10 @@ export function TransferDotPanel() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <div className="grid grid-cols-2 gap-3 items-start">
-        <div className="flex flex-col gap-3">
-          <div className="rounded-xl border-2 border-border bg-background/40 p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="grid grid-cols-3 gap-3 items-stretch">
+        <div className="flex h-full flex-col gap-3">
+          <div className={PANEL_CARD_STRETCH_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Global scale</p>
             </div>
 
@@ -106,8 +113,8 @@ export function TransferDotPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl border-2 border-border bg-background/40 p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
+          <div className={PANEL_CARD_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Normal station dots</p>
             </div>
 
@@ -132,14 +139,14 @@ export function TransferDotPanel() {
                 />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between gap-3">
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
                   <p className="text-sm font-medium">Dot shape</p>
                   <div className="min-w-14 text-right font-mono text-sm capitalize">
                     {appearance.normalStationDotShape}
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {NORMAL_STATION_DOT_SHAPES.map((shape) => {
                     const isActive = appearance.normalStationDotShape === shape.value;
                     return (
@@ -184,189 +191,31 @@ export function TransferDotPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl border-2 border-border bg-background/40 p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">Station labels</p>
+          <div className={PANEL_CARD_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
+              <p className="text-sm font-medium">Emoji quick copy</p>
             </div>
-
-            <div className="flex flex-col gap-3">
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Route icon size</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.lineBadgeSize}px
-                  </div>
-                </div>
-                <input
-                  className="w-full accent-primary"
-                  type="range"
-                  min={lineBadgeRange.min}
-                  max={lineBadgeRange.max}
-                  step={lineBadgeRange.step}
-                  value={appearance.lineBadgeSize}
-                  onChange={(event) => {
-                    setMarkerAppearanceValue('lineBadgeSize', Number.parseFloat(event.target.value));
+            <div className="grid grid-cols-6 gap-2">
+              {EMOJI_PRESETS.map((preset) => (
+                <button
+                  key={`${preset.icon}`}
+                  className="flex h-12 w-full items-center justify-center rounded-md border border-border bg-background px-0 py-0 text-center transition-colors hover:bg-accent"
+                  type="button"
+                  title={preset.label}
+                  onClick={() => {
+                    void copyEmojiToClipboard(preset.icon, preset.label);
                   }}
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Station name text size</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.stationNameSize}px
-                  </div>
-                </div>
-                <input
-                  className="w-full accent-primary"
-                  type="range"
-                  min={stationNameRange.min}
-                  max={stationNameRange.max}
-                  step={stationNameRange.step}
-                  value={appearance.stationNameSize}
-                  onChange={(event) => {
-                    setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
-                  <span className="pr-3 text-sm font-medium">Join distinct station group names with slash '/'</span>
-                  <button
-                    aria-checked={appearance.joinTransferNames === 'on'}
-                    aria-label="Toggle joined transfer station names"
-                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
-                      appearance.joinTransferNames === 'on'
-                        ? 'border-primary bg-primary'
-                        : 'border-border bg-muted/60'
-                    }`}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      setJoinTransferNames(appearance.joinTransferNames === 'on' ? 'off' : 'on');
-                    }}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                        appearance.joinTransferNames === 'on' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-
-              <div>
-                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
-                  <span className="pr-3 text-sm font-medium">Preserve joined station names on zoom out</span>
-                  <button
-                    aria-checked={appearance.preserveJoinedTransferNamesOnZoomOut === 'on'}
-                    aria-label="Toggle preserving joined transfer names on zoom out"
-                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
-                      appearance.preserveJoinedTransferNamesOnZoomOut === 'on'
-                        ? 'border-primary bg-primary'
-                        : 'border-border bg-muted/60'
-                    }`}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      setPreserveJoinedTransferNamesOnZoomOut(
-                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'off' : 'on',
-                      );
-                    }}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Sort route icon by text</p>
-                  <div className="min-w-14 text-right font-mono text-sm capitalize">
-                    {appearance.routeSortDirection}
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {ROUTE_SORT_DIRECTIONS.map((direction) => {
-                    const isActive = appearance.routeSortDirection === direction.value;
-                    return (
-                      <button
-                        key={direction.value}
-                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
-                          isActive
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border bg-background hover:bg-accent'
-                        }`}
-                        type="button"
-                        onClick={() => {
-                          setRouteSortDirection(direction.value);
-                        }}
-                      >
-                        {direction.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="mt-1 flex cursor-pointer items-center justify-between transition-colors hover:bg-accent">
-                  <span className="text-sm font-medium">Group icons by shape</span>
-                  <button
-                    aria-checked={appearance.routeSortByShape === 'on'}
-                    aria-label="Toggle sort by shape"
-                    className={`relative h-6 w-11 rounded-full border transition-colors ${
-                      appearance.routeSortByShape === 'on'
-                        ? 'border-primary bg-primary'
-                        : 'border-border bg-muted/60'
-                    }`}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      setRouteSortByShape(appearance.routeSortByShape === 'on' ? 'off' : 'on');
-                    }}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                        appearance.routeSortByShape === 'on' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </label>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Route icon wrap width</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.routeIconWrapWidth}px
-                  </div>
-                </div>
-                <input
-                  className="mt-3 w-full accent-primary"
-                  type="range"
-                  min={routeIconWrapWidthRange.min}
-                  max={routeIconWrapWidthRange.max}
-                  step={routeIconWrapWidthRange.step}
-                  value={appearance.routeIconWrapWidth}
-                  onChange={(event) => {
-                    setMarkerAppearanceValue('routeIconWrapWidth', Number.parseFloat(event.target.value));
-                  }}
-                />
-              </div>
+                >
+                  <span className="text-lg leading-none">{preset.icon}</span>
+                </button>
+              ))}
             </div>
-
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="rounded-xl border-2 border-border bg-background/40 p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex h-full flex-col gap-3">
+          <div className={PANEL_CARD_STRETCH_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Station group dots</p>
             </div>
 
@@ -391,14 +240,14 @@ export function TransferDotPanel() {
                 />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between gap-3">
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
                   <p className="text-sm font-medium">Dot shape</p>
                   <div className="min-w-14 text-right font-mono text-sm capitalize">
                     {appearance.transferDotShape}
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {NORMAL_STATION_DOT_SHAPES.map((shape) => {
                     const isActive = appearance.transferDotShape === shape.value;
                     return (
@@ -421,8 +270,8 @@ export function TransferDotPanel() {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between gap-3">
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
                   <p className="text-sm font-medium">Dot color</p>
                   <span
                     className="h-6 w-6 rounded-full"
@@ -432,7 +281,7 @@ export function TransferDotPanel() {
                   />
                 </div>
 
-                <div className="mt-3 flex items-center gap-3">
+                <div className="flex items-center gap-3">
                   <input
                     className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
                     type="color"
@@ -452,8 +301,8 @@ export function TransferDotPanel() {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between gap-3">
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
                   <p className="text-sm font-medium">Outline color</p>
                   <span
                     className="h-6 w-6 rounded-full border border-border"
@@ -461,7 +310,7 @@ export function TransferDotPanel() {
                   />
                 </div>
 
-                <div className="mt-3 flex items-center gap-3">
+                <div className="flex items-center gap-3">
                   <input
                     className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
                     type="color"
@@ -503,23 +352,189 @@ export function TransferDotPanel() {
             </div>
           </div>
 
-          <div className="rounded-xl border-2 border-border bg-background/40 p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">Emoji quick copy</p>
+        </div>
+
+        <div className="flex h-full flex-col gap-3">
+          <div className={PANEL_CARD_STRETCH_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
+              <p className="text-sm font-medium">Station labels</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {EMOJI_PRESETS.map((preset) => (
-                <button
-                  key={`${preset.icon}`}
-                  className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-accent"
-                  type="button"
-                  title={preset.label}
-                  onClick={() => {
-                    void copyEmojiToClipboard(preset.icon, preset.label);
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Route icon size</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.lineBadgeSize}px
+                  </div>
+                </div>
+                <input
+                  className="w-full accent-primary"
+                  type="range"
+                  min={lineBadgeRange.min}
+                  max={lineBadgeRange.max}
+                  step={lineBadgeRange.step}
+                  value={appearance.lineBadgeSize}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('lineBadgeSize', Number.parseFloat(event.target.value));
                   }}
-                >
-                </button>
-              ))}
+                />
+              </div>
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
+                  <p className="text-sm font-medium">Route icon wrap width</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.routeIconWrapWidth}px
+                  </div>
+                </div>
+                <input
+                  className="w-full accent-primary"
+                  type="range"
+                  min={routeIconWrapWidthRange.min}
+                  max={routeIconWrapWidthRange.max}
+                  step={routeIconWrapWidthRange.step}
+                  value={appearance.routeIconWrapWidth}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('routeIconWrapWidth', Number.parseFloat(event.target.value));
+                  }}
+                />
+              </div>
+            
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Station name text size</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.stationNameSize}px
+                  </div>
+                </div>
+                <input
+                  className="w-full accent-primary"
+                  type="range"
+                  min={stationNameRange.min}
+                  max={stationNameRange.max}
+                  step={stationNameRange.step}
+                  value={appearance.stationNameSize}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Join distinct station group names with slash '/'</span>
+                  <button
+                    aria-checked={appearance.joinTransferNames === 'on'}
+                    aria-label="Toggle joined transfer station names"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.joinTransferNames === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setJoinTransferNames(appearance.joinTransferNames === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.joinTransferNames === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Preserve joined station names on zoom out</span>
+                  <button
+                    aria-checked={appearance.preserveJoinedTransferNamesOnZoomOut === 'on'}
+                    aria-label="Toggle preserving joined transfer names on zoom out"
+                    aria-disabled={appearance.joinTransferNames !== 'on'}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.joinTransferNames !== 'on'
+                        ? 'cursor-not-allowed border-border/60 bg-muted/40 opacity-50'
+                        : appearance.preserveJoinedTransferNamesOnZoomOut === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    disabled={appearance.joinTransferNames !== 'on'}
+                    onClick={() => {
+                      setPreserveJoinedTransferNamesOnZoomOut(
+                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'off' : 'on',
+                      );
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.preserveJoinedTransferNamesOnZoomOut === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
+                  <p className="text-sm font-medium">Sort route icons by text</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.routeSortDirection}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROUTE_SORT_DIRECTIONS.map((direction) => {
+                    const isActive = appearance.routeSortDirection === direction.value;
+                    return (
+                      <button
+                        key={direction.value}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-background hover:bg-accent'
+                        }`}
+                        type="button"
+                        onClick={() => {
+                          setRouteSortDirection(direction.value);
+                        }}
+                      >
+                        {direction.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="text-sm font-medium">Group route icons by shape</span>
+                  <button
+                    aria-checked={appearance.routeSortByShape === 'on'}
+                    aria-label="Toggle sort by shape"
+                    className={`relative h-6 w-11 rounded-full border transition-colors ${
+                      appearance.routeSortByShape === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setRouteSortByShape(appearance.routeSortByShape === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.routeSortByShape === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+
             </div>
           </div>
         </div>

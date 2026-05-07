@@ -19,9 +19,12 @@ const MOD_ID = 'com.naz.station-dots';
 const MOD_VERSION = '1.0.0';
 const TAG = '[Station Dots]';
 const STATION_DOT_SELECTOR = '.maplibregl-marker .rounded-full.relative.border-\\[1px\\]';
-const LINE_BADGE_ROW_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5';
-const LINE_BADGE_WRAPPER_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative:has(> .font-mta.cursor-pointer)';
-const LINE_BADGE_SELECTOR = '.maplibregl-marker .flex.gap-0\\.5 > .relative > .font-mta.cursor-pointer';
+const LINE_BADGE_ROW_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0 > .flex.gap-0\\.5';
+const LINE_BADGE_WRAPPER_SELECTOR =
+  '.maplibregl-marker .flex.flex-col.items-start.ml-0 > .flex.gap-0\\.5 > .relative:has(> .font-mta.cursor-pointer)';
+const LINE_BADGE_SELECTOR =
+  '.maplibregl-marker .flex.flex-col.items-start.ml-0 > .flex.gap-0\\.5 > .relative > .font-mta.cursor-pointer';
+const EDIT_ROUTE_ORDER_BUTTON_ROW_SELECTOR = '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5';
 const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
   '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5 > .cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
@@ -62,6 +65,9 @@ type EditRouteOrderButtonMetrics = {
   width: number;
   height: number;
   maxHeight: number;
+  borderWidth: number;
+  backgroundColor: string;
+  borderColor: string;
 };
 
 type EditRouteOrderIconMetrics = {
@@ -411,6 +417,9 @@ function getBaseEditRouteOrderButtonMetrics(button: HTMLElement): EditRouteOrder
       width: cachedWidth,
       height: cachedHeight,
       maxHeight: cachedMaxHeight,
+      borderWidth: Number.parseFloat(button.dataset.stationDotsRouteButtonBaseBorderWidth ?? '') || 0,
+      backgroundColor: button.dataset.stationDotsRouteButtonBaseBackgroundColor ?? '',
+      borderColor: button.dataset.stationDotsRouteButtonBaseBorderColor ?? '',
     };
   }
 
@@ -419,11 +428,17 @@ function getBaseEditRouteOrderButtonMetrics(button: HTMLElement): EditRouteOrder
     width: getElementWidth(button),
     height: getElementHeight(button),
     maxHeight: parsePixelValue(computedStyle.maxHeight) ?? getElementHeight(button),
+    borderWidth: parsePixelValue(computedStyle.borderWidth) ?? 0,
+    backgroundColor: computedStyle.backgroundColor,
+    borderColor: computedStyle.borderColor,
   };
 
   button.dataset.stationDotsRouteButtonBaseWidth = String(metrics.width);
   button.dataset.stationDotsRouteButtonBaseHeight = String(metrics.height);
   button.dataset.stationDotsRouteButtonBaseMaxHeight = String(metrics.maxHeight);
+  button.dataset.stationDotsRouteButtonBaseBorderWidth = String(metrics.borderWidth);
+  button.dataset.stationDotsRouteButtonBaseBackgroundColor = metrics.backgroundColor;
+  button.dataset.stationDotsRouteButtonBaseBorderColor = metrics.borderColor;
 
   return metrics;
 }
@@ -544,6 +559,7 @@ function applyMarkerAppearance(root: ParentNode): void {
   const lineBadgeRows = root.querySelectorAll<HTMLElement>(LINE_BADGE_ROW_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
   const lineBadges = root.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR);
+  const editRouteOrderButtonRows = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_ROW_SELECTOR);
   const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
 
@@ -572,6 +588,14 @@ function applyMarkerAppearance(root: ParentNode): void {
     row.style.alignItems = 'flex-start';
     row.style.width = `${routeIconWrapWidth * globalScale}px`;
     row.style.maxWidth = `${routeIconWrapWidth * globalScale}px`;
+    row.style.overflow = 'visible';
+  });
+
+  editRouteOrderButtonRows.forEach((row) => {
+    row.style.flexWrap = 'nowrap';
+    row.style.alignItems = 'center';
+    row.style.width = '';
+    row.style.maxWidth = '';
     row.style.overflow = 'visible';
   });
 
@@ -626,15 +650,21 @@ function applyMarkerAppearance(root: ParentNode): void {
     const scale = editRouteOrderButtonScale;
     const buttonMetrics = getBaseEditRouteOrderButtonMetrics(button);
 
-    button.style.transitionProperty = 'background-color, border-color, border-width, transform';
+    button.style.transitionProperty = 'none';
+    button.style.transitionDuration = '0ms';
+    button.style.transitionTimingFunction = 'linear';
     button.style.width = `${buttonMetrics.width * scale}px`;
     button.style.height = `${buttonMetrics.height * scale}px`;
     button.style.maxHeight = `${buttonMetrics.maxHeight * scale}px`;
+    button.style.backgroundColor = buttonMetrics.backgroundColor;
+    button.style.borderColor = buttonMetrics.borderColor;
+    button.style.borderWidth = `${buttonMetrics.borderWidth}px`;
 
     const icon = button.querySelector<SVGSVGElement>(':scope > svg.lucide-plus');
     if (icon) {
       const iconMetrics = getBaseEditRouteOrderIconMetrics(icon);
-      icon.style.transitionProperty = 'color, opacity, transform';
+      icon.style.transitionProperty = 'none';
+      icon.style.transitionDuration = '0ms';
       icon.style.width = `${iconMetrics.width * scale}px`;
       icon.style.height = `${iconMetrics.height * scale}px`;
     }
@@ -642,7 +672,8 @@ function applyMarkerAppearance(root: ParentNode): void {
     const label = button.querySelector<HTMLElement>(':scope > .text-white.font-semibold.leading-none');
     if (label) {
       const labelMetrics = getBaseEditRouteOrderLabelMetrics(label);
-      label.style.transitionProperty = 'color, opacity, transform';
+      label.style.transitionProperty = 'none';
+      label.style.transitionDuration = '0ms';
       label.style.fontSize = `${labelMetrics.fontSize * scale}px`;
     }
   });
@@ -886,7 +917,7 @@ if (!api) {
           icon: 'Circle',
           tooltip: TOOLBAR_PANEL_TITLE,
           title: TOOLBAR_PANEL_TITLE,
-          width: 680,
+          width: 1000,
           render: MarkerAppearanceToolbarHost,
         });
       }
