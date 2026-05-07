@@ -30,8 +30,8 @@ const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
   '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5 > .cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
-const STATION_NAME_HOVER_SCALE = 1.18;
-const HOVER_ANIMATION_DURATION_MS = 140;
+const STATION_NAME_HOVER_SCALE = 1.06;
+const HOVER_ANIMATION_DURATION_MS = 50;
 const HOVER_ANIMATION_EASING = 'ease-out';
 
 const api = window.SubwayBuilderAPI;
@@ -137,6 +137,15 @@ function getElementMaxWidth(element: HTMLElement): number {
   if (inlineMaxWidth !== null && inlineMaxWidth > 0) return inlineMaxWidth;
 
   return element.getBoundingClientRect().width;
+}
+
+function getFlexRowNaturalWidth(row: HTMLElement): number {
+  const gap = parsePixelValue(getComputedStyle(row).columnGap) ?? 0;
+  const children = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+  if (children.length === 0) return 0;
+
+  const childrenWidth = children.reduce((total, child) => total + child.getBoundingClientRect().width, 0);
+  return childrenWidth + gap * Math.max(0, children.length - 1);
 }
 
 function scalePixelTransforms(value: string, scale: number): string {
@@ -687,8 +696,11 @@ function applyMarkerAppearance(root: ParentNode): void {
   });
 
   lineBadgeRows.forEach((row) => {
-    const wrapLimitWidth = routeIconWrapWidth * globalScale;
-    const naturalWidth = row.scrollWidth;
+    const marker = row.closest('.maplibregl-marker');
+    const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
+    const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
+    const wrapLimitWidth = routeIconWrapWidth * globalScale * hoverScale;
+    const naturalWidth = getFlexRowNaturalWidth(row);
     const appliedWidth = Math.min(naturalWidth, wrapLimitWidth);
 
     row.style.flexWrap = 'wrap';
