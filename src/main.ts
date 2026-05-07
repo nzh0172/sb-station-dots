@@ -30,8 +30,8 @@ const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
   '.maplibregl-marker .flex.relative.border-background.w-fit.gap-0\\.5 > .cursor-pointer';
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
-const STATION_NAME_HOVER_SCALE = 1.06;
-const HOVER_ANIMATION_DURATION_MS = 50;
+const STATION_NAME_HOVER_SCALE = 1.1;
+const HOVER_ANIMATION_DURATION_MS = 0;
 const HOVER_ANIMATION_EASING = 'ease-out';
 
 const api = window.SubwayBuilderAPI;
@@ -643,9 +643,12 @@ function applyMarkerAppearance(root: ParentNode): void {
   editRouteOrderButtonRows.forEach((row) => {
     row.style.flexWrap = 'nowrap';
     row.style.alignItems = 'center';
-    row.style.width = '';
-    row.style.maxWidth = '';
+    row.style.display = 'flex';
+    row.style.width = 'max-content';
+    row.style.maxWidth = 'none';
+    row.style.flex = '0 0 auto';
     row.style.overflow = 'visible';
+    row.style.marginRight = '0px';
   });
 
   lineBadgeWrappers.forEach((wrapper) => {
@@ -738,6 +741,11 @@ function applyMarkerAppearance(root: ParentNode): void {
       label.style.transitionDuration = '0ms';
       label.style.fontSize = `${labelMetrics.fontSize * scale}px`;
     }
+  });
+
+  editRouteOrderButtonRows.forEach((row) => {
+    const rowWidth = getFlexRowNaturalWidth(row);
+    row.style.marginRight = `${rowWidth * -0.5}px`;
   });
 
   stationNames.forEach((name) => {
