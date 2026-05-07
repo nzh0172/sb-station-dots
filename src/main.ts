@@ -623,10 +623,11 @@ function applyMarkerAppearance(root: ParentNode): void {
   });
 
   lineBadgeRows.forEach((row) => {
-    row.style.flexWrap = 'wrap';
+    row.style.display = 'flex';
+    row.style.flexWrap = 'nowrap';
     row.style.alignItems = 'flex-start';
-    row.style.width = `${routeIconWrapWidth * globalScale}px`;
-    row.style.maxWidth = `${routeIconWrapWidth * globalScale}px`;
+    row.style.width = 'max-content';
+    row.style.maxWidth = 'none';
     row.style.overflow = 'visible';
   });
 
@@ -683,6 +684,16 @@ function applyMarkerAppearance(root: ParentNode): void {
 
       label.style.transform = scalePixelTransforms(label.dataset.stationDotsBaseTransform, scale);
     }
+  });
+
+  lineBadgeRows.forEach((row) => {
+    const wrapLimitWidth = routeIconWrapWidth * globalScale;
+    const naturalWidth = row.scrollWidth;
+    const appliedWidth = Math.min(naturalWidth, wrapLimitWidth);
+
+    row.style.flexWrap = 'wrap';
+    row.style.width = `${appliedWidth}px`;
+    row.style.maxWidth = `${wrapLimitWidth}px`;
   });
 
   editRouteOrderButtons.forEach((button) => {
