@@ -9,6 +9,7 @@ import {
   getMarkerAppearance,
   subscribeMarkerAppearance,
   type JoinTransferNames,
+  type JoinTransferNamesOrder,
   type NormalStationDotShape,
   type PreserveJoinedTransferNamesOnZoomOut,
   type RouteSortByShape,
@@ -151,7 +152,18 @@ function normalizeLabelText(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function buildTransferStationGroups(): TransferStationGroup[] {
+function compareStationNames(left: string, right: string): number {
+  return left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function getStationRecentOrderScore(station: { id: string; createdAt: number }): number {
+  return station.createdAt;
+}
+
+function buildTransferStationGroups(joinTransferNamesOrder: JoinTransferNamesOrder): TransferStationGroup[] {
   if (!api?.gameState) return [];
 
   const stations = api.gameState.getStations();
@@ -167,9 +179,34 @@ function buildTransferStationGroups(): TransferStationGroup[] {
         .map((stationId) => stationById.get(stationId))
         .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
 
-      const names = Array.from(
-        new Set(groupStations.map((entry) => normalizeLabelText(entry.name)).filter((entry) => entry.length > 0)),
-      );
+      const stationsByName = new Map<string, typeof groupStations>();
+      groupStations.forEach((station) => {
+        const normalizedName = normalizeLabelText(station.name);
+        if (normalizedName.length === 0) return;
+
+        const existingStations = stationsByName.get(normalizedName);
+        if (existingStations) {
+          existingStations.push(station);
+          return;
+        }
+
+        stationsByName.set(normalizedName, [station]);
+      });
+
+      const names = Array.from(stationsByName.keys()).sort((left, right) => {
+        if (joinTransferNamesOrder === 'alphabetical') {
+          return compareStationNames(left, right);
+        }
+
+        const leftRecentScore = Math.max(
+          ...(stationsByName.get(left) ?? []).map((station) => getStationRecentOrderScore(station)),
+        );
+        const rightRecentScore = Math.max(
+          ...(stationsByName.get(right) ?? []).map((station) => getStationRecentOrderScore(station)),
+        );
+
+        return rightRecentScore - leftRecentScore || compareStationNames(left, right);
+      });
 
       const routeBullets = Array.from(
         new Set(
@@ -201,6 +238,7 @@ function getTransferStationLabel(
   marker: HTMLElement,
   fallbackName: string,
   joinTransferNames: JoinTransferNames,
+  joinTransferNamesOrder: JoinTransferNamesOrder,
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut,
   dotKind: 'transfer' | 'station' | null,
 ): string {
@@ -211,7 +249,7 @@ function getTransferStationLabel(
   const routeBullets = getMarkerRouteBadgeLabels(marker);
   if (routeBullets.length === 0) return normalizedFallbackName;
 
-  const matchingGroup = buildTransferStationGroups().find((group) => {
+  const matchingGroup = buildTransferStationGroups(joinTransferNamesOrder).find((group) => {
     return arraysMatch(group.routeBullets, routeBullets) && group.names.includes(normalizedFallbackName);
   });
 
@@ -547,6 +585,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     editRouteOrderButtonScale,
     stationNameSize,
     joinTransferNames,
+    joinTransferNamesOrder,
     preserveJoinedTransferNamesOnZoomOut,
     routeIconWrapWidth,
     routeSortByShape,
@@ -700,6 +739,7 @@ function applyMarkerAppearance(root: ParentNode): void {
             marker,
             baseName,
             joinTransferNames,
+            joinTransferNamesOrder,
             preserveJoinedTransferNamesOnZoomOut,
             dotKind,
           )

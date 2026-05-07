@@ -10,6 +10,7 @@ export type MarkerAppearanceKey =
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
   | 'joinTransferNames'
+  | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
   | 'routeSortDirection'
   | 'routeSortByShape'
@@ -22,6 +23,7 @@ type NumericMarkerAppearanceKey = Exclude<
   | 'normalStationDotShape'
   | 'transferDotShape'
   | 'joinTransferNames'
+  | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
   | 'routeSortDirection'
   | 'routeSortByShape'
@@ -31,6 +33,7 @@ type NumericMarkerAppearanceKey = Exclude<
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
+export type JoinTransferNamesOrder = 'recent' | 'alphabetical';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
@@ -55,6 +58,7 @@ export type MarkerAppearanceState = {
   editRouteOrderButtonScale: number;
   stationNameSize: number;
   joinTransferNames: JoinTransferNames;
+  joinTransferNamesOrder: JoinTransferNamesOrder;
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut;
   routeSortDirection: RouteSortDirection;
   routeSortByShape: RouteSortByShape;
@@ -132,6 +136,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: 'off',
     storageKey: 'com.author.modname:join-transfer-names',
   },
+  joinTransferNamesOrder: {
+    defaultValue: 'recent',
+    storageKey: 'com.author.modname:join-transfer-names-order',
+  },
   preserveJoinedTransferNamesOnZoomOut: {
     defaultValue: 'off',
     storageKey: 'com.author.modname:preserve-joined-transfer-names-on-zoom-out',
@@ -175,6 +183,7 @@ const state: MarkerAppearanceState = {
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
   joinTransferNames: loadValue('joinTransferNames'),
+  joinTransferNamesOrder: loadValue('joinTransferNamesOrder'),
   preserveJoinedTransferNamesOnZoomOut: loadValue('preserveJoinedTransferNamesOnZoomOut'),
   routeSortDirection: loadValue('routeSortDirection'),
   routeSortByShape: loadValue('routeSortByShape'),
@@ -230,6 +239,10 @@ function normalizeJoinTransferNames(value: string): JoinTransferNames {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeJoinTransferNamesOrder(value: string): JoinTransferNamesOrder {
+  return value.trim().toLowerCase() === 'alphabetical' ? 'alphabetical' : 'recent';
+}
+
 function normalizePreserveJoinedTransferNamesOnZoomOut(value: string): PreserveJoinedTransferNamesOnZoomOut {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
@@ -244,6 +257,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'joinTransferNames') {
     return normalizeJoinTransferNames(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'joinTransferNamesOrder') {
+    return normalizeJoinTransferNamesOrder(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'preserveJoinedTransferNamesOnZoomOut') {
@@ -351,6 +368,16 @@ export function setJoinTransferNames(value: string): void {
   emit();
 }
 
+export function setJoinTransferNamesOrder(value: string): void {
+  const nextValue = normalizeJoinTransferNamesOrder(value);
+
+  if (nextValue === state.joinTransferNamesOrder) return;
+
+  state.joinTransferNamesOrder = nextValue;
+  saveValue('joinTransferNamesOrder', nextValue);
+  emit();
+}
+
 export function setPreserveJoinedTransferNamesOnZoomOut(value: string): void {
   const nextValue = normalizePreserveJoinedTransferNamesOnZoomOut(value);
 
@@ -383,6 +410,7 @@ export function resetMarkerAppearance(): void {
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
   state.joinTransferNames = SETTINGS.joinTransferNames.defaultValue as JoinTransferNames;
+  state.joinTransferNamesOrder = SETTINGS.joinTransferNamesOrder.defaultValue as JoinTransferNamesOrder;
   state.preserveJoinedTransferNamesOnZoomOut =
     SETTINGS.preserveJoinedTransferNamesOnZoomOut.defaultValue as PreserveJoinedTransferNamesOnZoomOut;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
@@ -402,6 +430,7 @@ export function resetMarkerAppearance(): void {
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
   saveValue('joinTransferNames', state.joinTransferNames);
+  saveValue('joinTransferNamesOrder', state.joinTransferNamesOrder);
   saveValue('preserveJoinedTransferNamesOnZoomOut', state.preserveJoinedTransferNamesOnZoomOut);
   saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('routeSortByShape', state.routeSortByShape);

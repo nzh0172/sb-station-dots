@@ -5,6 +5,7 @@ import {
   getMarkerAppearanceRange,
   resetMarkerAppearance,
   setJoinTransferNames,
+  setJoinTransferNamesOrder,
   setPreserveJoinedTransferNamesOnZoomOut,
   setRouteSortByShape,
   setRouteSortDirection,
@@ -36,6 +37,10 @@ const ROUTE_SORT_DIRECTIONS = [
   { label: 'Original', value: 'original' },
   { label: 'Ascending', value: 'ascending' },
   { label: 'Descending', value: 'descending' },
+] as const;
+const JOIN_NAME_ORDERS = [
+  { label: 'Recent', value: 'recent' },
+  { label: 'Alphabetical', value: 'alphabetical' },
 ] as const;
 const PANEL_CARD_CLASS = 'rounded-xl border-2 border-border bg-background/40 p-4';
 const PANEL_CARD_STRETCH_CLASS = `h-full ${PANEL_CARD_CLASS}`;
@@ -444,6 +449,41 @@ export function TransferDotPanel() {
                     />
                   </button>
                 </label>
+              </div>
+
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
+                  <p className="text-sm font-medium">Joined name order</p>
+                  <div className="min-w-14 text-right font-mono text-sm capitalize">
+                    {appearance.joinTransferNamesOrder}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {JOIN_NAME_ORDERS.map((order) => {
+                    const isActive = appearance.joinTransferNamesOrder === order.value;
+                    const isDisabled = appearance.joinTransferNames !== 'on';
+
+                    return (
+                      <button
+                        key={order.value}
+                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                          isDisabled
+                            ? 'cursor-not-allowed border-border/60 bg-muted/40 text-muted-foreground opacity-50'
+                            : isActive
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border bg-background hover:bg-accent'
+                        }`}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          setJoinTransferNamesOrder(order.value);
+                        }}
+                      >
+                        {order.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
