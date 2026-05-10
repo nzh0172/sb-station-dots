@@ -38,10 +38,6 @@ const ROUTE_SORT_DIRECTIONS = [
   { label: 'Ascending', value: 'ascending' },
   { label: 'Descending', value: 'descending' },
 ] as const;
-const JOIN_NAME_ORDERS = [
-  { label: 'Recent', value: 'recent' },
-  { label: 'Alphabetical', value: 'alphabetical' },
-] as const;
 const PANEL_CARD_CLASS = 'rounded-xl border-2 border-border bg-background/40 p-4';
 const PANEL_CARD_STRETCH_CLASS = `h-full ${PANEL_CARD_CLASS}`;
 const PANEL_CARD_HEADER_CLASS = 'mb-4 flex items-center justify-between gap-3';
@@ -451,39 +447,34 @@ export function TransferDotPanel() {
                 </label>
               </div>
 
-              <div className={PANEL_FIELD_CLASS}>
-                <div className={PANEL_FIELD_ROW_CLASS}>
-                  <p className="text-sm font-medium">Joined name order</p>
-                  <div className="min-w-14 text-right font-mono text-sm capitalize">
-                    {appearance.joinTransferNamesOrder}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {JOIN_NAME_ORDERS.map((order) => {
-                    const isActive = appearance.joinTransferNamesOrder === order.value;
-                    const isDisabled = appearance.joinTransferNames !== 'on';
-
-                    return (
-                      <button
-                        key={order.value}
-                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
-                          isDisabled
-                            ? 'cursor-not-allowed border-border/60 bg-muted/40 text-muted-foreground opacity-50'
-                            : isActive
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border bg-background hover:bg-accent'
-                        }`}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => {
-                          setJoinTransferNamesOrder(order.value);
-                        }}
-                      >
-                        {order.label}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Flip joined station names</span>
+                  <button
+                    aria-checked={appearance.joinTransferNamesOrder === 'on'}
+                    aria-label="Toggle flipping joined station names"
+                    aria-disabled={appearance.joinTransferNames !== 'on'}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.joinTransferNames !== 'on'
+                        ? 'cursor-not-allowed border-border/60 bg-muted/40 opacity-50'
+                        : appearance.joinTransferNamesOrder === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    disabled={appearance.joinTransferNames !== 'on'}
+                    onClick={() => {
+                      setJoinTransferNamesOrder(appearance.joinTransferNamesOrder === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.joinTransferNamesOrder === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
               </div>
 
               <div>

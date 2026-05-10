@@ -33,7 +33,7 @@ type NumericMarkerAppearanceKey = Exclude<
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
-export type JoinTransferNamesOrder = 'recent' | 'alphabetical';
+export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
@@ -137,7 +137,7 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     storageKey: 'com.author.modname:join-transfer-names',
   },
   joinTransferNamesOrder: {
-    defaultValue: 'recent',
+    defaultValue: 'off',
     storageKey: 'com.author.modname:join-transfer-names-order',
   },
   preserveJoinedTransferNamesOnZoomOut: {
@@ -240,7 +240,9 @@ function normalizeJoinTransferNames(value: string): JoinTransferNames {
 }
 
 function normalizeJoinTransferNamesOrder(value: string): JoinTransferNamesOrder {
-  return value.trim().toLowerCase() === 'alphabetical' ? 'alphabetical' : 'recent';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'on' || normalized === 'alphabetical') return 'on';
+  return 'off';
 }
 
 function normalizePreserveJoinedTransferNamesOnZoomOut(value: string): PreserveJoinedTransferNamesOnZoomOut {

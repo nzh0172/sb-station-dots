@@ -203,10 +203,6 @@ function buildTransferStationGroups(joinTransferNamesOrder: JoinTransferNamesOrd
       });
 
       const names = Array.from(stationsByName.keys()).sort((left, right) => {
-        if (joinTransferNamesOrder === 'alphabetical') {
-          return compareStationNames(left, right);
-        }
-
         const leftRecentScore = Math.max(
           ...(stationsByName.get(left) ?? []).map((station) => getStationRecentOrderScore(station)),
         );
@@ -264,7 +260,8 @@ function getTransferStationLabel(
 
   if (!matchingGroup) return normalizedFallbackName;
 
-  return matchingGroup.names.join('/');
+  const displayNames = joinTransferNamesOrder === 'on' ? [...matchingGroup.names].reverse() : matchingGroup.names;
+  return displayNames.join('/');
 }
 
 function compareRouteBadgeLabels(left: string, right: string): number {
