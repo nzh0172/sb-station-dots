@@ -142,10 +142,16 @@ function getElementMaxWidth(element: HTMLElement): number {
 function getFlexRowNaturalWidth(row: HTMLElement): number {
   const gap = parsePixelValue(getComputedStyle(row).columnGap) ?? 0;
   const children = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
-  if (children.length === 0) return 0;
+  if (children.length === 0) {
+    return row.scrollWidth || row.offsetWidth || 0;
+  }
 
-  const childrenWidth = children.reduce((total, child) => total + child.getBoundingClientRect().width, 0);
-  return childrenWidth + gap * Math.max(0, children.length - 1);
+  const childrenWidth = children.reduce((total, child) => {
+    const layoutWidth = child.offsetWidth || getElementWidth(child);
+    return total + layoutWidth;
+  }, 0);
+
+  return Math.max(childrenWidth + gap * Math.max(0, children.length - 1), row.scrollWidth, row.offsetWidth);
 }
 
 function scalePixelTransforms(value: string, scale: number): string {
