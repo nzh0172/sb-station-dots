@@ -147,11 +147,20 @@ function getFlexRowNaturalWidth(row: HTMLElement): number {
   }
 
   const childrenWidth = children.reduce((total, child) => {
-    const layoutWidth = child.offsetWidth || getElementWidth(child);
+    const content = child.firstElementChild instanceof HTMLElement ? child.firstElementChild : null;
+    const layoutWidth = Math.max(
+      child.offsetWidth,
+      child.scrollWidth,
+      Math.ceil(child.getBoundingClientRect().width),
+      content?.offsetWidth ?? 0,
+      content?.scrollWidth ?? 0,
+      content ? Math.ceil(content.getBoundingClientRect().width) : 0,
+      getElementWidth(child),
+    );
     return total + layoutWidth;
   }, 0);
 
-  return Math.max(childrenWidth + gap * Math.max(0, children.length - 1), row.scrollWidth, row.offsetWidth);
+  return Math.ceil(Math.max(childrenWidth + gap * Math.max(0, children.length - 1), row.scrollWidth, row.offsetWidth));
 }
 
 function scalePixelTransforms(value: string, scale: number): string {
