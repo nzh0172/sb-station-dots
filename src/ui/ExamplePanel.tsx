@@ -12,6 +12,7 @@ import {
   setMarkerAppearanceColor,
   setMarkerAppearanceShape,
   setMarkerAppearanceValue,
+  setTransferDotCapsule,
   subscribeMarkerAppearance,
 } from '../markerAppearance';
 
@@ -221,6 +222,32 @@ export function TransferDotPanel() {
             </div>
 
             <div className="flex flex-col gap-3">
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Capsule route dots</span>
+                  <button
+                    aria-checked={appearance.transferDotCapsule === 'on'}
+                    aria-label="Toggle station group capsule route dots"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.transferDotCapsule === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setTransferDotCapsule(appearance.transferDotCapsule === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.transferDotCapsule === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">Dot size</p>

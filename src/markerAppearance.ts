@@ -4,6 +4,7 @@ export type MarkerAppearanceKey =
   | 'normalStationDotShape'
   | 'normalStationDotOutlineThickness'
   | 'transferDotSize'
+  | 'transferDotCapsule'
   | 'transferDotShape'
   | 'transferDotOutlineThickness'
   | 'lineBadgeSize'
@@ -21,6 +22,7 @@ export type MarkerAppearanceKey =
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
   | 'normalStationDotShape'
+  | 'transferDotCapsule'
   | 'transferDotShape'
   | 'joinTransferNames'
   | 'joinTransferNamesOrder'
@@ -33,6 +35,7 @@ type NumericMarkerAppearanceKey = Exclude<
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
+export type TransferDotCapsule = 'off' | 'on';
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
@@ -52,6 +55,7 @@ export type MarkerAppearanceState = {
   normalStationDotShape: NormalStationDotShape;
   normalStationDotOutlineThickness: number;
   transferDotSize: number;
+  transferDotCapsule: TransferDotCapsule;
   transferDotShape: NormalStationDotShape;
   transferDotOutlineThickness: number;
   lineBadgeSize: number;
@@ -99,6 +103,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     max: 1.6,
     step: 0.05,
     storageKey: 'com.author.modname:transfer-dot-size-rem',
+  },
+  transferDotCapsule: {
+    defaultValue: 'off',
+    storageKey: 'com.author.modname:transfer-dot-capsule',
   },
   transferDotShape: {
     defaultValue: 'circle',
@@ -177,6 +185,7 @@ const state: MarkerAppearanceState = {
   normalStationDotShape: loadValue('normalStationDotShape'),
   normalStationDotOutlineThickness: loadValue('normalStationDotOutlineThickness'),
   transferDotSize: loadValue('transferDotSize'),
+  transferDotCapsule: loadValue('transferDotCapsule'),
   transferDotShape: loadValue('transferDotShape'),
   transferDotOutlineThickness: loadValue('transferDotOutlineThickness'),
   lineBadgeSize: loadValue('lineBadgeSize'),
@@ -235,6 +244,10 @@ function normalizeRouteSortByShape(value: string): RouteSortByShape {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeTransferDotCapsule(value: string): TransferDotCapsule {
+  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
 function normalizeJoinTransferNames(value: string): JoinTransferNames {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
@@ -259,6 +272,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'joinTransferNames') {
     return normalizeJoinTransferNames(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'transferDotCapsule') {
+    return normalizeTransferDotCapsule(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'joinTransferNamesOrder') {
@@ -343,6 +360,16 @@ export function setMarkerAppearanceShape(key: 'normalStationDotShape' | 'transfe
   emit();
 }
 
+export function setTransferDotCapsule(value: string): void {
+  const nextValue = normalizeTransferDotCapsule(value);
+
+  if (nextValue === state.transferDotCapsule) return;
+
+  state.transferDotCapsule = nextValue;
+  saveValue('transferDotCapsule', nextValue);
+  emit();
+}
+
 export function setRouteSortDirection(value: string): void {
   const nextValue = normalizeRouteSortDirection(value);
 
@@ -406,6 +433,7 @@ export function resetMarkerAppearance(): void {
   state.normalStationDotShape = SETTINGS.normalStationDotShape.defaultValue as NormalStationDotShape;
   state.normalStationDotOutlineThickness = SETTINGS.normalStationDotOutlineThickness.defaultValue as number;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
+  state.transferDotCapsule = SETTINGS.transferDotCapsule.defaultValue as TransferDotCapsule;
   state.transferDotShape = SETTINGS.transferDotShape.defaultValue as NormalStationDotShape;
   state.transferDotOutlineThickness = SETTINGS.transferDotOutlineThickness.defaultValue as number;
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
@@ -426,6 +454,7 @@ export function resetMarkerAppearance(): void {
   saveValue('normalStationDotShape', state.normalStationDotShape);
   saveValue('normalStationDotOutlineThickness', state.normalStationDotOutlineThickness);
   saveValue('transferDotSize', state.transferDotSize);
+  saveValue('transferDotCapsule', state.transferDotCapsule);
   saveValue('transferDotShape', state.transferDotShape);
   saveValue('transferDotOutlineThickness', state.transferDotOutlineThickness);
   saveValue('lineBadgeSize', state.lineBadgeSize);
