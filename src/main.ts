@@ -526,12 +526,13 @@ function getCapsuleTransferEntries(
     .filter((route): route is Route => route !== undefined)
     .map((route): CapsuleTransferEntryWithSort => {
       const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
+      const routeColor = route.color || badgeColorByLabel.get(displayLabel) || '#666666';
 
       return {
         label: getRouteCapsuleLabel(route, splitRouteCodeFromName),
         stationNumber: getRouteStationNumber(route, matchingGroup.group.stationIds, stationById),
-        routeColor: route.color || badgeColorByLabel.get(displayLabel) || '#666666',
-        textColor: '#111111',
+        routeColor,
+        textColor: route.textColor || getReadableTextColor(routeColor),
         displayOrder: markerRouteLabelOrder.get(displayLabel) ?? Number.MAX_SAFE_INTEGER,
         displayLabel,
       };
@@ -838,8 +839,36 @@ function normalizeColor(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
 }
 
+function getReadableTextColor(backgroundColor: string): string {
+  const normalizedColor = normalizeColor(backgroundColor);
+  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  const rgbMatch = normalizedColor.match(/^rgba?\((\d+),(\d+),(\d+)/);
+  let red: number;
+  let green: number;
+  let blue: number;
+
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    const fullHex = hex.length === 3 ? hex.split('').map((part) => `${part}${part}`).join('') : hex;
+    red = Number.parseInt(fullHex.slice(0, 2), 16);
+    green = Number.parseInt(fullHex.slice(2, 4), 16);
+    blue = Number.parseInt(fullHex.slice(4, 6), 16);
+  } else if (rgbMatch) {
+    red = Number.parseInt(rgbMatch[1], 10);
+    green = Number.parseInt(rgbMatch[2], 10);
+    blue = Number.parseInt(rgbMatch[3], 10);
+  } else {
+    return '#ffffff';
+  }
+
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+  return luminance > 150 ? '#111111' : '#ffffff';
+}
+
 function isStationMarkerDot(dot: HTMLElement): boolean {
+  if (dot.dataset.stationDotsKind === 'transfer' || dot.dataset.stationDotsKind === 'station') return true;
   if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`)) return true;
+  if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_ROW_CLASS}`)) return true;
 
   const backgroundColor = normalizeColor(dot.style.backgroundColor || getComputedStyle(dot).backgroundColor);
   return backgroundColor.length > 0 && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0,0,0,0)';
@@ -1118,6 +1147,132 @@ function tightenCapsuleLabelSpacing(marker: HTMLElement, dot: HTMLElement, globa
   }
 
   wrapper.style.marginLeft = `${Math.round(capsuleWidth * -0.5 + tightGap)}px`;
+}
+
+function placeStationNameAboveTransferDot(marker: HTMLElement, dot: HTMLElement, globalScale: number): void {
+  const name = marker.querySelector<HTMLElement>(STATION_NAME_SELECTOR);
+  if (!name || name.style.display === 'none') return;
+
+  const dotRect = dot.getBoundingClientRect();
+  const nameRect = name.getBoundingClientRect();
+  if (dotRect.width <= 0 || dotRect.height <= 0 || nameRect.width <= 0 || nameRect.height <= 0) return;
+
+  const gap = Math.max(2, 3 * globalScale);
+  const targetLeft = dotRect.left + dotRect.width / 2 - nameRect.width / 2;
+  const targetTop = dotRect.top - nameRect.height - gap;
+  const translateX = Math.round(targetLeft - nameRect.left);
+  const translateY = Math.round(targetTop - nameRect.top);
+
+  name.style.transform = `translate(${translateX}px, ${translateY}px)`;
+  name.style.transformOrigin = 'center bottom';
+  name.style.textAlign = 'center';
+  name.style.zIndex = '1';
+}
+
+function applyTransferGummyWormDotStyle(
+  dot: HTMLElement,
+  dotSize: number,
+  outlineThickness: number,
+  globalScale: number,
+  lineBadgeSize: number,
+  entries: CapsuleTransferEntry[],
+): void {
+  const segmentHeight = Math.max(16, lineBadgeSize * globalScale);
+  const textSize = Math.max(10, segmentHeight * 0.62);
+
+  removeTransferCapsuleDots(dot);
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
+  dot.style.width = 'max-content';
+  dot.style.height = 'auto';
+  dot.style.minHeight = `${segmentHeight}px`;
+  dot.style.display = 'flex';
+  dot.style.flexDirection = 'column';
+  dot.style.alignItems = 'center';
+  dot.style.justifyContent = 'center';
+  dot.style.gap = `${Math.max(2, outlineThickness * globalScale + 1)}px`;
+  dot.style.padding = '0';
+  dot.style.boxSizing = 'border-box';
+  dot.style.borderRadius = '9999px';
+  dot.style.backgroundColor = 'transparent';
+  dot.style.borderColor = 'transparent';
+  dot.style.borderWidth = '0';
+  dot.style.overflow = 'visible';
+  dot.style.position = 'relative';
+  dot.style.filter = '';
+
+  const rowSizes = getBalancedCapsuleRowSizes(entries.length);
+  const rows = rowSizes.map(() => {
+    const row = document.createElement('span');
+    row.className = TRANSFER_CAPSULE_ROW_CLASS;
+    dot.appendChild(row);
+
+    row.style.display = 'inline-flex';
+    row.style.alignItems = 'center';
+    row.style.justifyContent = 'center';
+    row.style.width = 'max-content';
+    row.style.maxWidth = '100%';
+    row.style.pointerEvents = 'none';
+
+    return row;
+  });
+  let currentRowIndex = 0;
+  let entriesInCurrentRow = 0;
+
+  entries.forEach((entry, index) => {
+    const row = rows[currentRowIndex];
+    if (!row) return;
+
+    const segment = document.createElement('span');
+    const label = document.createElement('span');
+    const stationNumber = document.createElement('span');
+    const isFirst = entriesInCurrentRow === 0;
+    const isLast = entriesInCurrentRow === rowSizes[currentRowIndex] - 1;
+
+    segment.className = TRANSFER_CAPSULE_DOT_CLASS;
+    segment.append(label, stationNumber);
+    row.appendChild(segment);
+
+    segment.style.display = 'inline-flex';
+    segment.style.alignItems = 'center';
+    segment.style.justifyContent = 'center';
+    segment.style.gap = '0';
+    segment.style.height = `${segmentHeight}px`;
+    segment.style.minWidth = `${Math.max(1.05, dotSize * 1.35)}rem`;
+    segment.style.paddingLeft = `${Math.max(5, dotSize * 4.9 * globalScale)}px`;
+    segment.style.paddingRight = `${Math.max(5, dotSize * 4.9 * globalScale)}px`;
+    segment.style.marginLeft = isFirst ? '0' : `${Math.max(1, outlineThickness * globalScale) * -1}px`;
+    segment.style.flex = '0 0 auto';
+    segment.style.border = `${Math.max(1, outlineThickness * globalScale)}px solid ${entry.routeColor}`;
+    segment.style.borderRadius = `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`;
+    segment.style.backgroundColor = entry.routeColor;
+    segment.style.boxSizing = 'border-box';
+    segment.style.overflow = 'hidden';
+    segment.style.pointerEvents = 'none';
+
+    label.textContent = entry.label;
+    label.style.color = entry.textColor;
+    label.style.fontFamily = 'inherit';
+    label.style.fontSize = `${textSize}px`;
+    label.style.fontWeight = '800';
+    label.style.lineHeight = '1';
+    label.style.whiteSpace = 'nowrap';
+
+    stationNumber.textContent = entry.stationNumber;
+    stationNumber.style.color = entry.textColor;
+    stationNumber.style.fontFamily = 'inherit';
+    stationNumber.style.fontSize = `${textSize}px`;
+    stationNumber.style.fontWeight = '800';
+    stationNumber.style.lineHeight = '1';
+    stationNumber.style.whiteSpace = 'nowrap';
+
+    entriesInCurrentRow += 1;
+    if (entriesInCurrentRow >= rowSizes[currentRowIndex]) {
+      currentRowIndex += 1;
+      entriesInCurrentRow = 0;
+    }
+  });
 }
 
 function applyTransferBubblyDotStyle(
@@ -1473,6 +1628,9 @@ function applyMarkerAppearance(root: ParentNode): void {
     name.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
     name.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     name.style.transform = '';
+    name.style.order = '';
+    name.style.textAlign = '';
+    name.style.zIndex = '';
 
     const wrapper = name.closest(STATION_NAME_WRAPPER_SELECTOR);
     if (!(wrapper instanceof HTMLElement)) return;
@@ -1483,6 +1641,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     wrapper.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
     wrapper.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     wrapper.style.overflow = '';
+    wrapper.style.alignItems = '';
     wrapper.style.marginLeft = '';
   });
 
@@ -1530,6 +1689,28 @@ function applyMarkerAppearance(root: ParentNode): void {
           transferDotOutlineColor,
           globalScale,
         );
+      } else if (transferDotStyle === 'wormy') {
+        const gummyEntries =
+          marker instanceof HTMLElement ? getCapsuleTransferEntries(marker, splitRouteCodeFromName) : [];
+        if (gummyEntries.length > 0) {
+          applyTransferGummyWormDotStyle(
+            dot,
+            dotSize,
+            transferDotOutlineThickness,
+            globalScale,
+            lineBadgeSize,
+            gummyEntries,
+          );
+          if (marker instanceof HTMLElement) {
+            tightenCapsuleLabelSpacing(marker, dot, globalScale);
+            placeStationNameAboveTransferDot(marker, dot, globalScale);
+          }
+        } else {
+          applyNormalStationDotShape(dot, transferDotShape);
+          dot.style.backgroundColor = transferDotColor;
+          dot.style.borderColor = transferDotOutlineColor;
+          dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
+        }
       } else if (transferDotStyle === 'capsule') {
         const capsuleEntries =
           marker instanceof HTMLElement ? getCapsuleTransferEntries(marker, splitRouteCodeFromName) : [];
@@ -1545,6 +1726,7 @@ function applyMarkerAppearance(root: ParentNode): void {
           );
           if (marker instanceof HTMLElement) {
             tightenCapsuleLabelSpacing(marker, dot, globalScale);
+            placeStationNameAboveTransferDot(marker, dot, globalScale);
           }
         } else {
           applyNormalStationDotShape(dot, transferDotShape);

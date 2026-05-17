@@ -43,6 +43,7 @@ const TRANSFER_DOT_STYLES = [
   { label: 'Bubbly', value: 'bubbly' },
   { label: 'Tri-color', value: 'tri-color' },
   { label: 'Capsule', value: 'capsule' },
+  { label: 'Wormy', value: 'wormy' },
 ] as const;
 const ROUTE_SORT_DIRECTIONS = [
   { label: 'Original', value: 'original' },
@@ -315,7 +316,7 @@ export function TransferDotPanel() {
                 />
               </div>
 
-              {appearance.transferDotStyle === 'capsule' ? (
+              {appearance.transferDotStyle === 'capsule' || appearance.transferDotStyle === 'wormy' ? (
                 <div className="rounded-md border border-blue-400/40 bg-blue-500/10 p-3 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
                   <p className="font-small text-blue-900 dark:text-blue-50">How to make a route code</p>
                   <p className="mt-1">
@@ -541,7 +542,7 @@ export function TransferDotPanel() {
 
               <div>
                 <label className={PANEL_SWITCH_ROW_CLASS}>
-                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule style)</span>
+                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule & wormy)</span>
                   <button
                     aria-checked={appearance.splitRouteCodeFromName === 'on'}
                     aria-label="Toggle route code and name split"
