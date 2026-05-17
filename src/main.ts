@@ -4,6 +4,7 @@
  */
 
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import samtaegukUrl from './data/samtaeguk.png?inline';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
 import {
   getMarkerAppearance,
@@ -611,6 +612,10 @@ function removeTransferCapsuleDots(dot: HTMLElement): void {
   dot.style.transformOrigin = '';
   dot.style.filter = '';
   dot.style.position = '';
+  dot.style.backgroundImage = '';
+  dot.style.backgroundPosition = '';
+  dot.style.backgroundRepeat = '';
+  dot.style.backgroundSize = '';
 }
 
 function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotShape): void {
@@ -772,6 +777,41 @@ function applyTransferBubblyDotStyle(
     innerCircle.style.backgroundColor = routeColor;
     innerCircle.style.pointerEvents = 'none';
   });
+}
+
+function applyTransferTriniteDotStyle(
+  dot: HTMLElement,
+  dotSize: number,
+  outlineThickness: number,
+  backgroundColor: string,
+  outlineColor: string,
+  globalScale: number,
+): void {
+  removeTransferCapsuleDots(dot);
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
+  dot.style.width = `${dotSize}rem`;
+  dot.style.height = `${dotSize}rem`;
+  dot.style.minHeight = `${dotSize}rem`;
+  dot.style.display = 'block';
+  dot.style.flexDirection = '';
+  dot.style.alignItems = '';
+  dot.style.justifyContent = '';
+  dot.style.gap = '';
+  dot.style.padding = '0';
+  dot.style.boxSizing = 'border-box';
+  dot.style.borderRadius = '9999px';
+  dot.style.backgroundColor = backgroundColor;
+  dot.style.backgroundImage = `url("${samtaegukUrl}")`;
+  dot.style.backgroundPosition = 'center';
+  dot.style.backgroundRepeat = 'no-repeat';
+  dot.style.backgroundSize = 'cover';
+  dot.style.borderColor = outlineColor;
+  dot.style.borderWidth = `${outlineThickness * globalScale}px`;
+  dot.style.overflow = 'hidden';
+  dot.style.position = 'relative';
+  dot.style.filter = '';
 }
 
 function applyMarkerAppearance(root: ParentNode): void {
@@ -1028,6 +1068,15 @@ function applyMarkerAppearance(root: ParentNode): void {
           transferDotOutlineColor,
           globalScale,
           effectiveRouteColors,
+        );
+      } else if (transferDotStyle === 'trinite') {
+        applyTransferTriniteDotStyle(
+          dot,
+          dotSize,
+          transferDotOutlineThickness,
+          transferDotColor,
+          transferDotOutlineColor,
+          globalScale,
         );
       } else {
         applyNormalStationDotShape(dot, transferDotShape);
