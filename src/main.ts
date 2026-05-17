@@ -33,6 +33,7 @@ const EDIT_ROUTE_ORDER_BUTTON_SELECTOR =
 const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duration-300.font-bold.text-stroke';
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
 const STATION_NAME_HOVER_SCALE = 1.1;
+const TRANSFER_CAPSULE_LABEL_GAP_PX = 4;
 const HOVER_ANIMATION_DURATION_MS = 0;
 const HOVER_ANIMATION_EASING = 'ease-out';
 
@@ -936,6 +937,20 @@ function applyTransferCapsuleDotStyle(
   });
 }
 
+function tightenCapsuleLabelSpacing(marker: HTMLElement, dot: HTMLElement, globalScale: number): void {
+  const wrapper = marker.querySelector<HTMLElement>(STATION_NAME_WRAPPER_SELECTOR);
+  if (!wrapper) return;
+
+  const capsuleWidth = dot.getBoundingClientRect().width || dot.offsetWidth;
+  const tightGap = TRANSFER_CAPSULE_LABEL_GAP_PX * globalScale;
+  if (capsuleWidth <= tightGap) {
+    wrapper.style.marginLeft = '';
+    return;
+  }
+
+  wrapper.style.marginLeft = `${Math.round(capsuleWidth * -0.5 + tightGap)}px`;
+}
+
 function applyTransferBubblyDotStyle(
   dot: HTMLElement,
   dotSize: number,
@@ -1288,6 +1303,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     wrapper.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
     wrapper.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     wrapper.style.overflow = '';
+    wrapper.style.marginLeft = '';
   });
 
   dots.forEach((dot) => {
@@ -1346,6 +1362,9 @@ function applyMarkerAppearance(root: ParentNode): void {
             globalScale,
             capsuleEntries,
           );
+          if (marker instanceof HTMLElement) {
+            tightenCapsuleLabelSpacing(marker, dot, globalScale);
+          }
         } else {
           applyNormalStationDotShape(dot, transferDotShape);
           dot.style.backgroundColor = transferDotColor;
