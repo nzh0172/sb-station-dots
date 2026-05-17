@@ -40,7 +40,7 @@ type NumericMarkerAppearanceKey = Exclude<
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
 export type TransferDotTrafficLight = 'off' | 'on';
-export type TransferDotStyle = 'single' | 'trafficLight' | 'bubbly' | 'trinite' | 'capsule';
+export type TransferDotStyle = 'single' | 'traffic light' | 'bubbly' | 'trinite' | 'capsule';
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type SplitRouteCodeFromName = 'off' | 'on';
@@ -114,7 +114,7 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
   },
   transferDotTrafficLight: {
     defaultValue: 'off',
-    storageKey: 'com.author.modname:transfer-dot-trafficlight',
+    storageKey: 'com.author.modname:transfer-dot-traffic light',
   },
   transferDotStyle: {
     defaultValue: 'single',
@@ -274,10 +274,10 @@ function normalizeTransferDotStyle(value: string): TransferDotStyle {
       return 'capsule';
     case 'trinite':
       return 'trinite';
-    case 'trafficlight':
+    case 'traffic light':
     case 'traffic-light':
     case 'traffic_light':
-      return 'trafficLight';
+      return 'traffic light';
     default:
       return 'single';
   }
@@ -319,7 +319,7 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'transferDotStyle') {
     const legacyCapsule = window.localStorage.getItem(SETTINGS.transferDotTrafficLight.storageKey);
-    const fallback = legacyCapsule === 'on' ? 'trafficLight' : String(setting.defaultValue);
+    const fallback = legacyCapsule === 'on' ? 'traffic light' : String(setting.defaultValue);
     return normalizeTransferDotStyle(stored ?? fallback) as MarkerAppearanceState[K];
   }
 
@@ -425,7 +425,7 @@ export function setTransferDotStyle(value: string): void {
   if (nextValue === state.transferDotStyle) return;
 
   state.transferDotStyle = nextValue;
-  state.transferDotTrafficLight = nextValue === 'trafficLight' ? 'on' : 'off';
+  state.transferDotTrafficLight = nextValue === 'traffic light' ? 'on' : 'off';
   saveValue('transferDotStyle', nextValue);
   saveValue('transferDotTrafficLight', state.transferDotTrafficLight);
   emit();

@@ -42,6 +42,7 @@ const api = window.SubwayBuilderAPI;
 const CLEANUP_KEY = '__markerAppearanceCleanup';
 const TOOLBAR_PANEL_TITLE = 'Station Dots';
 const TRANSFER_CAPSULE_DOT_CLASS = 'station-dots-transfer-capsule-dot';
+const TRANSFER_CAPSULE_ROW_CLASS = 'station-dots-transfer-capsule-row';
 
 type CleanupHandle = {
   observer?: MutationObserver;
@@ -428,6 +429,16 @@ function getRouteStationNumber(route: Route, groupStationIds: string[], stationB
 function getCapsuleStationNumberSortValue(stationNumber: string): number {
   const parsed = Number.parseInt(stationNumber, 10);
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function getBalancedCapsuleRowSizes(entryCount: number): number[] {
+  if (entryCount <= 0) return [];
+
+  const rowCount = Math.ceil(entryCount / 4);
+  const baseRowSize = Math.floor(entryCount / rowCount);
+  const extraEntries = entryCount % rowCount;
+
+  return Array.from({ length: rowCount }, (_, index) => baseRowSize + (index < extraEntries ? 1 : 0));
 }
 
 function pickCapsuleEntryByLowerStationNumber(
@@ -870,11 +881,15 @@ function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
 }
 
 function removeTransferCapsuleDots(dot: HTMLElement): void {
+  dot.querySelectorAll(`:scope > .${TRANSFER_CAPSULE_ROW_CLASS}`).forEach((row) => row.remove());
   dot.querySelectorAll(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`).forEach((innerDot) => innerDot.remove());
   dot.style.display = '';
   dot.style.flexDirection = '';
+  dot.style.gridTemplateColumns = '';
+  dot.style.gridAutoRows = '';
   dot.style.alignItems = '';
   dot.style.justifyContent = '';
+  dot.style.justifyItems = '';
   dot.style.gap = '';
   dot.style.padding = '';
   dot.style.boxSizing = '';
@@ -967,12 +982,10 @@ function applyTransferCapsuleDotStyle(
   dot.style.width = 'max-content';
   dot.style.height = 'auto';
   dot.style.minHeight = `${Math.max(dotSize, dotSize * 1.7)}rem`;
-  dot.style.display = 'grid';
-  dot.style.gridTemplateColumns = `repeat(${Math.min(entries.length, 4)}, max-content)`;
-  dot.style.gridAutoRows = 'max-content';
+  dot.style.display = 'flex';
+  dot.style.flexDirection = 'column';
   dot.style.alignItems = 'center';
   dot.style.justifyContent = 'center';
-  dot.style.justifyItems = 'center';
   dot.style.gap = `${Math.max(2, outlineThickness * globalScale + 1)}px`;
   dot.style.padding = `${Math.max(3, outlineThickness * globalScale + 2)}px`;
   dot.style.boxSizing = 'border-box';
@@ -984,7 +997,34 @@ function applyTransferCapsuleDotStyle(
   dot.style.position = 'relative';
   dot.style.filter = '';
 
+  const rowGap = Math.max(2, outlineThickness * globalScale + 1);
+  const rowSizes = getBalancedCapsuleRowSizes(entries.length);
+  const rows = rowSizes.map((rowSize) => {
+    const row = document.createElement('span');
+    row.className = TRANSFER_CAPSULE_ROW_CLASS;
+    dot.appendChild(row);
+
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = `repeat(${rowSize}, max-content)`;
+    row.style.gridAutoRows = 'max-content';
+    row.style.alignItems = 'center';
+    row.style.justifyContent = 'center';
+    row.style.justifyItems = 'center';
+    row.style.columnGap = `${rowGap}px`;
+    row.style.width = 'max-content';
+    row.style.maxWidth = '100%';
+    row.style.pointerEvents = 'none';
+
+    return row;
+  });
+
+  let currentRowIndex = 0;
+  let entriesInCurrentRow = 0;
+
   entries.forEach((entry) => {
+    const row = rows[currentRowIndex];
+    if (!row) return;
+
     const routeBox = document.createElement('span');
     const routeLabel = document.createElement('span');
     const stationNumber = document.createElement('span');
@@ -993,7 +1033,7 @@ function applyTransferCapsuleDotStyle(
 
     routeBox.className = TRANSFER_CAPSULE_DOT_CLASS;
     routeBox.append(routeLabel, stationNumber);
-    dot.appendChild(routeBox);
+    row.appendChild(routeBox);
 
     routeBox.style.display = 'grid';
     routeBox.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)';
@@ -1037,7 +1077,33 @@ function applyTransferCapsuleDotStyle(
     stationNumber.style.fontWeight = '700';
     stationNumber.style.lineHeight = '0.95';
     stationNumber.style.minHeight = '0';
+
+    entriesInCurrentRow += 1;
+    if (entriesInCurrentRow >= rowSizes[currentRowIndex]) {
+      currentRowIndex += 1;
+      entriesInCurrentRow = 0;
+    }
   });
+
+  const routeBoxes = Array.from(dot.querySelectorAll<HTMLElement>(`.${TRANSFER_CAPSULE_DOT_CLASS}`));
+  const largestBoxWidth = Math.ceil(
+    Math.max(
+      0,
+      ...routeBoxes.map((routeBox) =>
+        Math.max(routeBox.scrollWidth, routeBox.offsetWidth, routeBox.getBoundingClientRect().width),
+      ),
+    ),
+  );
+
+  if (largestBoxWidth > 0) {
+    routeBoxes.forEach((routeBox) => {
+      routeBox.style.width = `${largestBoxWidth}px`;
+    });
+    rows.forEach((row) => {
+      const rowSize = row.children.length;
+      row.style.gridTemplateColumns = `repeat(${rowSize}, ${largestBoxWidth}px)`;
+    });
+  }
 }
 
 function tightenCapsuleLabelSpacing(marker: HTMLElement, dot: HTMLElement, globalScale: number): void {
