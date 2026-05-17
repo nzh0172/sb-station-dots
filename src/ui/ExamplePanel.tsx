@@ -39,6 +39,7 @@ const TRANSFER_DOT_STYLES = [
   { label: 'Traffic light', value: 'trafficLight' },
   { label: 'Bubbly', value: 'bubbly' },
   { label: 'Trinite', value: 'trinite' },
+  { label: 'Capsule', value: 'capsule' },
 ] as const;
 const ROUTE_SORT_DIRECTIONS = [
   { label: 'Original', value: 'original' },
@@ -239,7 +240,7 @@ export function TransferDotPanel() {
                     {getTransferDotStyleLabel(appearance.transferDotStyle)}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {TRANSFER_DOT_STYLES.map((style) => {
                     const isActive = appearance.transferDotStyle === style.value;
                     return (

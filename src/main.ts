@@ -4,6 +4,7 @@
  */
 
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { Route, Station, StationGroup } from './types/game-state';
 import samtaegukUrl from './data/samtaeguk.png?inline';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
 import {
@@ -89,6 +90,25 @@ type StationNameWrapperMetrics = {
 type TransferStationGroup = {
   names: string[];
   routeBullets: string[];
+};
+
+type CapsuleTransferEntry = {
+  label: string;
+  stationNumber: string;
+  routeColor: string;
+  textColor: string;
+};
+
+type CapsuleTransferEntryWithSort = CapsuleTransferEntry & {
+  displayOrder: number;
+  displayLabel: string;
+};
+
+type CapsuleStationGroupMatch = {
+  group: StationGroup;
+  groupRouteIds: string[];
+  groupRouteLabels: string[];
+  stationNameMatches: boolean;
 };
 
 function parsePixelValue(value: string | null | undefined): number | null {
@@ -260,6 +280,158 @@ function getMarkerRouteBadgeColors(marker: HTMLElement): string[] {
   return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
     .map((badge) => normalizeColor(badge.style.backgroundColor || getComputedStyle(badge).backgroundColor))
     .filter((color) => color.length > 0 && color !== 'transparent' && color !== 'rgba(0,0,0,0)');
+}
+
+function getMarkerRouteBadgeLabelsInDisplayOrder(marker: HTMLElement): string[] {
+  return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
+    .map((badge) => normalizeLabelText(badge.textContent ?? ''))
+    .filter((label) => label.length > 0);
+}
+
+function getRouteDisplayLabel(route: { bullet?: string; name?: string }): string {
+  return normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '');
+}
+
+function getRouteInitials(route: { bullet?: string; name?: string }): string {
+  const bullet = normalizeLabelText(route.bullet ?? '');
+  if (bullet.length > 0) return bullet;
+
+  const name = normalizeLabelText(route.name ?? '');
+  if (name.length === 0) return '?';
+
+  const initials = name
+    .split(/[\s-]+/)
+    .map((part) => part[0] ?? '')
+    .join('')
+    .toUpperCase();
+
+  return initials.slice(0, 2) || name.slice(0, 1).toUpperCase();
+}
+
+function getMarkerStationBaseName(marker: HTMLElement): string {
+  const name = marker.querySelector<HTMLElement>(STATION_NAME_SELECTOR);
+  return normalizeLabelText(name?.dataset.stationDotsBaseName || name?.textContent || '');
+}
+
+function getRouteStationNumber(route: Route, groupStationIds: string[], stationById: Map<string, Station>): string {
+  const stationIndex = route.stations?.findIndex((station) => groupStationIds.includes(station.id)) ?? -1;
+  if (stationIndex >= 0) return String(stationIndex + 1);
+
+  const groupStNodeIds = new Set(
+    groupStationIds
+      .map((stationId) => stationById.get(stationId))
+      .filter((station): station is Station => station !== undefined)
+      .flatMap((station) => station.stNodeIds),
+  );
+  const timing = route.stComboTimings
+    ?.filter((entry) => groupStNodeIds.has(entry.stNodeId))
+    .sort((left, right) => left.stNodeIndex - right.stNodeIndex)[0];
+
+  return timing ? String(timing.stNodeIndex + 1) : '?';
+}
+
+function getCapsuleStationNumberSortValue(stationNumber: string): number {
+  const parsed = Number.parseInt(stationNumber, 10);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function pickCapsuleEntryByLowerStationNumber(
+  left: CapsuleTransferEntryWithSort,
+  right: CapsuleTransferEntryWithSort,
+): CapsuleTransferEntryWithSort {
+  const stationNumberOrder =
+    getCapsuleStationNumberSortValue(left.stationNumber) - getCapsuleStationNumberSortValue(right.stationNumber);
+  if (stationNumberOrder <= 0) return left;
+
+  return right;
+}
+
+function dedupeCapsuleEntriesByRouteLabel(entries: CapsuleTransferEntryWithSort[]): CapsuleTransferEntryWithSort[] {
+  const entryByDisplayLabel = new Map<string, CapsuleTransferEntryWithSort>();
+
+  entries.forEach((entry) => {
+    const existingEntry = entryByDisplayLabel.get(entry.displayLabel);
+    entryByDisplayLabel.set(
+      entry.displayLabel,
+      existingEntry ? pickCapsuleEntryByLowerStationNumber(existingEntry, entry) : entry,
+    );
+  });
+
+  return Array.from(entryByDisplayLabel.values());
+}
+
+function getCapsuleTransferEntries(marker: HTMLElement): CapsuleTransferEntry[] {
+  if (!api?.gameState) return [];
+
+  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
+  const markerRouteLabelsInDisplayOrder = getMarkerRouteBadgeLabelsInDisplayOrder(marker);
+  const markerRouteLabelOrder = new Map(markerRouteLabelsInDisplayOrder.map((label, index) => [label, index]));
+  if (markerRouteLabels.length === 0) return [];
+
+  const markerStationName = getMarkerStationBaseName(marker);
+  const routes = api.gameState.getRoutes();
+  const stations = api.gameState.getStations();
+  const stationGroups = api.gameState.getStationGroups();
+  const routeById = new Map<string, Route>(routes.map((route) => [route.id, route]));
+  const stationById = new Map<string, Station>(stations.map((station) => [station.id, station]));
+  const badgeColorByLabel = new Map(
+    Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR)).map((badge) => [
+      normalizeLabelText(badge.textContent ?? ''),
+      normalizeColor(badge.style.backgroundColor || getComputedStyle(badge).backgroundColor),
+    ]),
+  );
+
+  const matchingGroups: CapsuleStationGroupMatch[] = stationGroups
+    .map((group): CapsuleStationGroupMatch => {
+      const groupStations = group.stationIds
+        .map((stationId) => stationById.get(stationId))
+        .filter((station): station is Station => station !== undefined);
+      const groupRouteIds = Array.from(new Set(groupStations.flatMap((station) => station.routeIds)));
+      const groupRouteLabels = Array.from(
+        new Set(
+          groupRouteIds
+            .map((routeId) => routeById.get(routeId))
+            .map((route) => (route ? getRouteDisplayLabel(route) : ''))
+            .filter((label) => label.length > 0),
+        ),
+      ).sort((left, right) => compareRouteBadgeLabels(left, right));
+      const stationNameMatches =
+        markerStationName.length === 0 ||
+        normalizeLabelText(group.name) === markerStationName ||
+        groupStations.some((station) => normalizeLabelText(station.name) === markerStationName);
+
+      return {
+        group,
+        groupRouteIds,
+        groupRouteLabels,
+        stationNameMatches,
+      };
+    })
+    .filter((entry) => arraysMatch(entry.groupRouteLabels, markerRouteLabels));
+
+  const matchingGroup = matchingGroups.find((entry) => entry.stationNameMatches) ?? matchingGroups[0];
+  if (!matchingGroup) return [];
+
+  const entries = matchingGroup.groupRouteIds
+    .map((routeId) => routeById.get(routeId))
+    .filter((route): route is Route => route !== undefined)
+    .map((route): CapsuleTransferEntryWithSort => {
+      const displayLabel = getRouteDisplayLabel(route);
+
+      return {
+        label: getRouteInitials(route),
+        stationNumber: getRouteStationNumber(route, matchingGroup.group.stationIds, stationById),
+        routeColor: route.color || badgeColorByLabel.get(displayLabel) || '#666666',
+        textColor: '#111111',
+        displayOrder: markerRouteLabelOrder.get(displayLabel) ?? Number.MAX_SAFE_INTEGER,
+        displayLabel,
+      };
+    })
+    .filter((entry) => markerRouteLabels.includes(entry.displayLabel));
+
+  return dedupeCapsuleEntriesByRouteLabel(entries)
+    .sort((left, right) => left.displayOrder - right.displayOrder || compareRouteBadgeLabels(left.displayLabel, right.displayLabel))
+    .map(({ label, stationNumber, routeColor, textColor }): CapsuleTransferEntry => ({ label, stationNumber, routeColor, textColor }));
 }
 
 function getTransferStationLabel(
@@ -637,7 +809,7 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
   dot.style.borderRadius = '9999px';
 }
 
-function applyTransferCapsuleDotStyle(
+function applyTransferTrafficLightDotStyle(
   dot: HTMLElement,
   dotSize: number,
   outlineThickness: number,
@@ -677,6 +849,90 @@ function applyTransferCapsuleDotStyle(
     innerDot.style.borderRadius = '9999px';
     innerDot.style.backgroundColor = routeColor;
     innerDot.style.pointerEvents = 'none';
+  });
+}
+
+function applyTransferCapsuleDotStyle(
+  dot: HTMLElement,
+  dotSize: number,
+  outlineThickness: number,
+  backgroundColor: string,
+  outlineColor: string,
+  globalScale: number,
+  entries: CapsuleTransferEntry[],
+): void {
+  removeTransferCapsuleDots(dot);
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
+  dot.style.width = 'max-content';
+  dot.style.height = 'auto';
+  dot.style.minHeight = `${Math.max(dotSize, dotSize * 1.7)}rem`;
+  dot.style.display = 'flex';
+  dot.style.flexDirection = 'row';
+  dot.style.alignItems = 'center';
+  dot.style.justifyContent = 'center';
+  dot.style.gap = `${Math.max(2, outlineThickness * globalScale + 1)}px`;
+  dot.style.padding = `${Math.max(3, outlineThickness * globalScale + 2)}px`;
+  dot.style.boxSizing = 'border-box';
+  dot.style.borderRadius = `${Math.max(4, dotSize * 5)}px`;
+  dot.style.backgroundColor = backgroundColor;
+  dot.style.borderColor = outlineColor;
+  dot.style.borderWidth = `${outlineThickness * globalScale}px`;
+  dot.style.overflow = 'visible';
+  dot.style.position = 'relative';
+  dot.style.filter = '';
+
+  entries.forEach((entry) => {
+    const routeBox = document.createElement('span');
+    const routeLabel = document.createElement('span');
+    const stationNumber = document.createElement('span');
+    const boxWidth = Math.max(0.82, dotSize * 0.96);
+    const boxHeight = Math.max(1.28, dotSize * 1.52);
+
+    routeBox.className = TRANSFER_CAPSULE_DOT_CLASS;
+    routeBox.append(routeLabel, stationNumber);
+    dot.appendChild(routeBox);
+
+    routeBox.style.display = 'grid';
+    routeBox.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)';
+    routeBox.style.alignItems = 'center';
+    routeBox.style.justifyItems = 'center';
+    routeBox.style.width = `${boxWidth}rem`;
+    routeBox.style.height = `${boxHeight}rem`;
+    routeBox.style.flex = '0 0 auto';
+    routeBox.style.border = `${Math.max(1, outlineThickness * globalScale)}px solid ${entry.routeColor}`;
+    routeBox.style.borderRadius = `${Math.max(3, dotSize * 4)}px`;
+    routeBox.style.backgroundColor = entry.routeColor;
+    routeBox.style.boxSizing = 'border-box';
+    routeBox.style.overflow = 'hidden';
+    routeBox.style.pointerEvents = 'none';
+
+    routeLabel.textContent = entry.label;
+    routeLabel.style.display = 'flex';
+    routeLabel.style.alignItems = 'center';
+    routeLabel.style.justifyContent = 'center';
+    routeLabel.style.width = '100%';
+    routeLabel.style.height = '100%';
+    routeLabel.style.color = '#ffffff';
+    routeLabel.style.fontFamily = 'inherit';
+    routeLabel.style.fontSize = `${Math.max(11, dotSize * 12.5 * globalScale)}px`;
+    routeLabel.style.fontWeight = '700';
+    routeLabel.style.lineHeight = '0.95';
+    routeLabel.style.minHeight = '0';
+
+    stationNumber.textContent = entry.stationNumber;
+    stationNumber.style.display = 'flex';
+    stationNumber.style.alignItems = 'center';
+    stationNumber.style.justifyContent = 'center';
+    stationNumber.style.width = '100%';
+    stationNumber.style.height = '100%';
+    stationNumber.style.color = '#ffffff';
+    stationNumber.style.fontFamily = 'inherit';
+    stationNumber.style.fontSize = `${Math.max(6, dotSize * 6.8 * globalScale)}px`;
+    stationNumber.style.fontWeight = '700';
+    stationNumber.style.lineHeight = '0.95';
+    stationNumber.style.minHeight = '0';
   });
 }
 
@@ -1050,7 +1306,7 @@ function applyMarkerAppearance(root: ParentNode): void {
 
     if (dotKind === 'transfer') {
       if (transferDotStyle === 'trafficLight' || (transferDotStyle === 'single' && transferDotTrafficLight === 'on')) {
-        applyTransferCapsuleDotStyle(
+        applyTransferTrafficLightDotStyle(
           dot,
           dotSize,
           transferDotOutlineThickness,
@@ -1078,6 +1334,24 @@ function applyMarkerAppearance(root: ParentNode): void {
           transferDotOutlineColor,
           globalScale,
         );
+      } else if (transferDotStyle === 'capsule') {
+        const capsuleEntries = marker instanceof HTMLElement ? getCapsuleTransferEntries(marker) : [];
+        if (capsuleEntries.length > 0) {
+          applyTransferCapsuleDotStyle(
+            dot,
+            dotSize,
+            transferDotOutlineThickness,
+            transferDotColor,
+            transferDotOutlineColor,
+            globalScale,
+            capsuleEntries,
+          );
+        } else {
+          applyNormalStationDotShape(dot, transferDotShape);
+          dot.style.backgroundColor = transferDotColor;
+          dot.style.borderColor = transferDotOutlineColor;
+          dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
+        }
       } else {
         applyNormalStationDotShape(dot, transferDotShape);
         dot.style.backgroundColor = transferDotColor;
