@@ -256,11 +256,9 @@ function getMarkerRouteBadgeLabels(marker: HTMLElement): string[] {
 }
 
 function getMarkerRouteBadgeColors(marker: HTMLElement): string[] {
-  const colors = Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
+  return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
     .map((badge) => normalizeColor(badge.style.backgroundColor || getComputedStyle(badge).backgroundColor))
     .filter((color) => color.length > 0 && color !== 'transparent' && color !== 'rgba(0,0,0,0)');
-
-  return colors.length > 0 ? Array.from(new Set(colors)) : ['#ffffff'];
 }
 
 function getTransferStationLabel(
@@ -558,6 +556,8 @@ function normalizeColor(value: string): string {
 }
 
 function isStationMarkerDot(dot: HTMLElement): boolean {
+  if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`)) return true;
+
   const backgroundColor = normalizeColor(dot.style.backgroundColor || getComputedStyle(dot).backgroundColor);
   return backgroundColor.length > 0 && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0,0,0,0)';
 }
@@ -578,14 +578,23 @@ function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
     return null;
   }
 
+  if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`)) {
+    dot.dataset.stationDotsKind = 'transfer';
+    return 'transfer';
+  }
+
+  if (isTransferDot(dot)) {
+    dot.dataset.stationDotsKind = 'transfer';
+    return 'transfer';
+  }
+
   const cachedKind = dot.dataset.stationDotsKind;
   if (cachedKind === 'transfer' || cachedKind === 'station') {
     return cachedKind;
   }
 
-  const kind = isTransferDot(dot) ? 'transfer' : 'station';
-  dot.dataset.stationDotsKind = kind;
-  return kind;
+  dot.dataset.stationDotsKind = 'station';
+  return 'station';
 }
 
 function removeTransferCapsuleDots(dot: HTMLElement): void {
@@ -598,6 +607,10 @@ function removeTransferCapsuleDots(dot: HTMLElement): void {
   dot.style.padding = '';
   dot.style.boxSizing = '';
   dot.style.minHeight = '';
+  dot.style.overflow = '';
+  dot.style.transformOrigin = '';
+  dot.style.filter = '';
+  dot.style.position = '';
 }
 
 function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotShape): void {
@@ -621,15 +634,17 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
 
 function applyTransferCapsuleDotStyle(
   dot: HTMLElement,
-  marker: HTMLElement,
   dotSize: number,
   outlineThickness: number,
   backgroundColor: string,
   outlineColor: string,
   globalScale: number,
+  routeColors: string[],
 ): void {
+  removeTransferCapsuleDots(dot);
   dot.style.clipPath = '';
   dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
   dot.style.width = `${dotSize}rem`;
   dot.style.height = 'auto';
   dot.style.minHeight = `${dotSize}rem`;
@@ -645,19 +660,10 @@ function applyTransferCapsuleDotStyle(
   dot.style.borderColor = outlineColor;
   dot.style.borderWidth = `${outlineThickness * globalScale}px`;
 
-  const routeColors = getMarkerRouteBadgeColors(marker);
-  const existingInnerDots = Array.from(dot.querySelectorAll<HTMLElement>(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`));
-
-  while (existingInnerDots.length > routeColors.length) {
-    existingInnerDots.pop()?.remove();
-  }
-
-  routeColors.forEach((routeColor, index) => {
-    const innerDot = existingInnerDots[index] ?? document.createElement('span');
-    if (!innerDot.parentElement) {
-      innerDot.className = TRANSFER_CAPSULE_DOT_CLASS;
-      dot.appendChild(innerDot);
-    }
+  routeColors.forEach((routeColor) => {
+    const innerDot = document.createElement('span');
+    innerDot.className = TRANSFER_CAPSULE_DOT_CLASS;
+    dot.appendChild(innerDot);
 
     innerDot.style.display = 'block';
     innerDot.style.width = `${Math.max(0.16, dotSize * 0.48)}rem`;
@@ -669,6 +675,105 @@ function applyTransferCapsuleDotStyle(
   });
 }
 
+function applyTransferBubblyDotStyle(
+  dot: HTMLElement,
+  dotSize: number,
+  outlineThickness: number,
+  backgroundColor: string,
+  outlineColor: string,
+  globalScale: number,
+  routeColors: string[],
+): void {
+  removeTransferCapsuleDots(dot);
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
+  dot.style.width = `${dotSize}rem`;
+  dot.style.height = 'auto';
+  dot.style.minHeight = '';
+  dot.style.display = 'flex';
+  dot.style.flexDirection = 'column';
+  dot.style.alignItems = 'center';
+  dot.style.justifyContent = 'center';
+  dot.style.gap = '0';
+  dot.style.padding = '0';
+  dot.style.boxSizing = 'border-box';
+  dot.style.borderRadius = '0';
+  dot.style.backgroundColor = 'transparent';
+  dot.style.borderColor = 'transparent';
+  dot.style.borderWidth = '0px';
+  dot.style.overflow = 'visible';
+  dot.style.position = 'relative';
+  dot.style.filter = '';
+
+  const circleOverlap = dotSize * 0.24;
+  const circleStep = dotSize - circleOverlap;
+  const stackHeight = dotSize + Math.max(0, routeColors.length - 1) * circleStep;
+  const outlineSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const outlinePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const viewBoxWidth = 100;
+  const viewBoxHeight = stackHeight * 100 / dotSize;
+  const radius = 50;
+  const centers = routeColors.map((_, index) => radius + index * (circleStep * 100 / dotSize));
+  const outlinePathData = centers
+    .map((centerY) => `M ${radius} ${centerY} m -${radius} 0 a ${radius} ${radius} 0 1 0 ${radius * 2} 0 a ${radius} ${radius} 0 1 0 -${radius * 2} 0`)
+    .join(' ');
+
+  outlineSvg.setAttribute('class', TRANSFER_CAPSULE_DOT_CLASS);
+  outlineSvg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
+  outlineSvg.style.position = 'absolute';
+  outlineSvg.style.left = '0';
+  outlineSvg.style.top = '0';
+  outlineSvg.style.width = `${dotSize}rem`;
+  outlineSvg.style.height = `${stackHeight}rem`;
+  outlineSvg.style.overflow = 'visible';
+  outlineSvg.style.pointerEvents = 'none';
+  outlineSvg.style.zIndex = '0';
+
+  outlinePath.setAttribute('d', outlinePathData);
+  outlinePath.setAttribute('fill', 'none');
+  outlinePath.setAttribute('stroke', outlineColor);
+  outlinePath.style.strokeWidth = `${Math.max(0, outlineThickness * globalScale * 2)}px`;
+  outlinePath.style.vectorEffect = 'non-scaling-stroke';
+  outlinePath.setAttribute('stroke-linejoin', 'round');
+  outlinePath.setAttribute('stroke-linecap', 'round');
+  outlineSvg.appendChild(outlinePath);
+  dot.appendChild(outlineSvg);
+
+  routeColors.forEach((routeColor, index) => {
+    const outerCircle = document.createElement('span');
+    const innerCircle = document.createElement('span');
+
+    outerCircle.className = TRANSFER_CAPSULE_DOT_CLASS;
+    outerCircle.appendChild(innerCircle);
+    dot.appendChild(outerCircle);
+
+    outerCircle.style.display = 'flex';
+    outerCircle.style.position = 'relative';
+    outerCircle.style.alignItems = 'center';
+    outerCircle.style.justifyContent = 'center';
+    outerCircle.style.width = `${dotSize}rem`;
+    outerCircle.style.height = `${dotSize}rem`;
+    outerCircle.style.flex = '0 0 auto';
+    outerCircle.style.marginTop = index === 0 ? '0' : `${-circleOverlap}rem`;
+    outerCircle.style.borderRadius = '9999px';
+    outerCircle.style.backgroundColor = backgroundColor;
+    outerCircle.style.borderColor = 'transparent';
+    outerCircle.style.borderStyle = 'solid';
+    outerCircle.style.borderWidth = '0px';
+    outerCircle.style.boxSizing = 'border-box';
+    outerCircle.style.pointerEvents = 'none';
+    outerCircle.style.zIndex = '1';
+
+    innerCircle.style.display = 'block';
+    innerCircle.style.width = `${Math.max(0.16, dotSize * 0.5)}rem`;
+    innerCircle.style.height = `${Math.max(0.16, dotSize * 0.5)}rem`;
+    innerCircle.style.borderRadius = '9999px';
+    innerCircle.style.backgroundColor = routeColor;
+    innerCircle.style.pointerEvents = 'none';
+  });
+}
+
 function applyMarkerAppearance(root: ParentNode): void {
   isApplyingMarkerAppearance = true;
   const {
@@ -677,7 +782,8 @@ function applyMarkerAppearance(root: ParentNode): void {
     normalStationDotShape,
     normalStationDotOutlineThickness,
     transferDotSize,
-    transferDotCapsule,
+    transferDotTrafficLight,
+    transferDotStyle,
     transferDotShape,
     transferDotOutlineThickness,
     lineBadgeSize,
@@ -700,40 +806,6 @@ function applyMarkerAppearance(root: ParentNode): void {
   const editRouteOrderButtonRows = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_ROW_SELECTOR);
   const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
-
-  dots.forEach((dot) => {
-    const dotKind = getDotKind(dot);
-    if (!dotKind) return;
-
-    const dotSize = (dotKind === 'transfer' ? transferDotSize : normalStationDotSize) * globalScale;
-    dot.style.width = `${dotSize}rem`;
-    dot.style.height = `${dotSize}rem`;
-
-    if (dotKind === 'transfer') {
-      const marker = dot.closest('.maplibregl-marker');
-
-      if (transferDotCapsule === 'on' && marker instanceof HTMLElement) {
-        applyTransferCapsuleDotStyle(
-          dot,
-          marker,
-          dotSize,
-          transferDotOutlineThickness,
-          transferDotColor,
-          transferDotOutlineColor,
-          globalScale,
-        );
-      } else {
-        applyNormalStationDotShape(dot, transferDotShape);
-        dot.style.backgroundColor = transferDotColor;
-        dot.style.borderColor = transferDotOutlineColor;
-        dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
-      }
-    } else {
-      applyNormalStationDotShape(dot, normalStationDotShape);
-      dot.style.borderColor = '';
-      dot.style.borderWidth = `${normalStationDotOutlineThickness * globalScale}px`;
-    }
-  });
 
   lineBadgeRows.forEach((row) => {
     row.style.display = 'flex';
@@ -921,6 +993,55 @@ function applyMarkerAppearance(root: ParentNode): void {
     wrapper.style.transitionTimingFunction = HOVER_ANIMATION_EASING;
     wrapper.style.overflow = '';
   });
+
+  dots.forEach((dot) => {
+    const marker = dot.closest('.maplibregl-marker');
+    const dotKind = getDotKind(dot);
+    if (!dotKind) return;
+
+    const routeColors =
+      marker instanceof HTMLElement
+        ? Array.from(new Set(getMarkerRouteBadgeColors(marker)))
+        : ['#ffffff'];
+    const effectiveRouteColors = routeColors.length > 0 ? routeColors : ['#ffffff'];
+    const dotSize = (dotKind === 'transfer' ? transferDotSize : normalStationDotSize) * globalScale;
+    dot.style.width = `${dotSize}rem`;
+    dot.style.height = `${dotSize}rem`;
+
+    if (dotKind === 'transfer') {
+      if (transferDotStyle === 'trafficLight' || (transferDotStyle === 'single' && transferDotTrafficLight === 'on')) {
+        applyTransferCapsuleDotStyle(
+          dot,
+          dotSize,
+          transferDotOutlineThickness,
+          transferDotColor,
+          transferDotOutlineColor,
+          globalScale,
+          effectiveRouteColors,
+        );
+      } else if (transferDotStyle === 'bubbly') {
+        applyTransferBubblyDotStyle(
+          dot,
+          dotSize,
+          transferDotOutlineThickness,
+          transferDotColor,
+          transferDotOutlineColor,
+          globalScale,
+          effectiveRouteColors,
+        );
+      } else {
+        applyNormalStationDotShape(dot, transferDotShape);
+        dot.style.backgroundColor = transferDotColor;
+        dot.style.borderColor = transferDotOutlineColor;
+        dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
+      }
+    } else {
+      applyNormalStationDotShape(dot, normalStationDotShape);
+      dot.style.borderColor = '';
+      dot.style.borderWidth = `${normalStationDotOutlineThickness * globalScale}px`;
+    }
+  });
+
   isApplyingMarkerAppearance = false;
 }
 

@@ -4,7 +4,8 @@ export type MarkerAppearanceKey =
   | 'normalStationDotShape'
   | 'normalStationDotOutlineThickness'
   | 'transferDotSize'
-  | 'transferDotCapsule'
+  | 'transferDotTrafficLight'
+  | 'transferDotStyle'
   | 'transferDotShape'
   | 'transferDotOutlineThickness'
   | 'lineBadgeSize'
@@ -22,7 +23,8 @@ export type MarkerAppearanceKey =
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
   | 'normalStationDotShape'
-  | 'transferDotCapsule'
+  | 'transferDotTrafficLight'
+  | 'transferDotStyle'
   | 'transferDotShape'
   | 'joinTransferNames'
   | 'joinTransferNamesOrder'
@@ -35,7 +37,8 @@ type NumericMarkerAppearanceKey = Exclude<
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
-export type TransferDotCapsule = 'off' | 'on';
+export type TransferDotTrafficLight = 'off' | 'on';
+export type TransferDotStyle = 'single' | 'trafficLight' | 'bubbly';
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
@@ -55,7 +58,8 @@ export type MarkerAppearanceState = {
   normalStationDotShape: NormalStationDotShape;
   normalStationDotOutlineThickness: number;
   transferDotSize: number;
-  transferDotCapsule: TransferDotCapsule;
+  transferDotTrafficLight: TransferDotTrafficLight;
+  transferDotStyle: TransferDotStyle;
   transferDotShape: NormalStationDotShape;
   transferDotOutlineThickness: number;
   lineBadgeSize: number;
@@ -104,9 +108,13 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 0.05,
     storageKey: 'com.author.modname:transfer-dot-size-rem',
   },
-  transferDotCapsule: {
+  transferDotTrafficLight: {
     defaultValue: 'off',
-    storageKey: 'com.author.modname:transfer-dot-capsule',
+    storageKey: 'com.author.modname:transfer-dot-trafficlight',
+  },
+  transferDotStyle: {
+    defaultValue: 'single',
+    storageKey: 'com.author.modname:transfer-dot-style',
   },
   transferDotShape: {
     defaultValue: 'circle',
@@ -185,9 +193,10 @@ const state: MarkerAppearanceState = {
   normalStationDotShape: loadValue('normalStationDotShape'),
   normalStationDotOutlineThickness: loadValue('normalStationDotOutlineThickness'),
   transferDotSize: loadValue('transferDotSize'),
-  transferDotCapsule: loadValue('transferDotCapsule'),
+  transferDotTrafficLight: loadValue('transferDotTrafficLight'),
   transferDotShape: loadValue('transferDotShape'),
   transferDotOutlineThickness: loadValue('transferDotOutlineThickness'),
+  transferDotStyle: loadValue('transferDotStyle'),
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
@@ -244,8 +253,21 @@ function normalizeRouteSortByShape(value: string): RouteSortByShape {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
-function normalizeTransferDotCapsule(value: string): TransferDotCapsule {
+function normalizeTransferDotTrafficLight(value: string): TransferDotTrafficLight {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
+function normalizeTransferDotStyle(value: string): TransferDotStyle {
+  switch (value.trim().toLowerCase()) {
+    case 'bubbly':
+      return 'bubbly';
+    case 'trafficlight':
+    case 'traffic-light':
+    case 'traffic_light':
+      return 'trafficLight';
+    default:
+      return 'single';
+  }
 }
 
 function normalizeJoinTransferNames(value: string): JoinTransferNames {
@@ -274,8 +296,14 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
     return normalizeJoinTransferNames(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
-  if (key === 'transferDotCapsule') {
-    return normalizeTransferDotCapsule(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  if (key === 'transferDotTrafficLight') {
+    return normalizeTransferDotTrafficLight(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'transferDotStyle') {
+    const legacyCapsule = window.localStorage.getItem(SETTINGS.transferDotTrafficLight.storageKey);
+    const fallback = legacyCapsule === 'on' ? 'trafficLight' : String(setting.defaultValue);
+    return normalizeTransferDotStyle(stored ?? fallback) as MarkerAppearanceState[K];
   }
 
   if (key === 'joinTransferNamesOrder') {
@@ -360,13 +388,25 @@ export function setMarkerAppearanceShape(key: 'normalStationDotShape' | 'transfe
   emit();
 }
 
-export function setTransferDotCapsule(value: string): void {
-  const nextValue = normalizeTransferDotCapsule(value);
+export function setTransferDotTrafficLight(value: string): void {
+  const nextValue = normalizeTransferDotTrafficLight(value);
 
-  if (nextValue === state.transferDotCapsule) return;
+  if (nextValue === state.transferDotTrafficLight) return;
 
-  state.transferDotCapsule = nextValue;
-  saveValue('transferDotCapsule', nextValue);
+  state.transferDotTrafficLight = nextValue;
+  saveValue('transferDotTrafficLight', nextValue);
+  emit();
+}
+
+export function setTransferDotStyle(value: string): void {
+  const nextValue = normalizeTransferDotStyle(value);
+
+  if (nextValue === state.transferDotStyle) return;
+
+  state.transferDotStyle = nextValue;
+  state.transferDotTrafficLight = nextValue === 'trafficLight' ? 'on' : 'off';
+  saveValue('transferDotStyle', nextValue);
+  saveValue('transferDotTrafficLight', state.transferDotTrafficLight);
   emit();
 }
 
@@ -433,7 +473,8 @@ export function resetMarkerAppearance(): void {
   state.normalStationDotShape = SETTINGS.normalStationDotShape.defaultValue as NormalStationDotShape;
   state.normalStationDotOutlineThickness = SETTINGS.normalStationDotOutlineThickness.defaultValue as number;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
-  state.transferDotCapsule = SETTINGS.transferDotCapsule.defaultValue as TransferDotCapsule;
+  state.transferDotTrafficLight = SETTINGS.transferDotTrafficLight.defaultValue as TransferDotTrafficLight;
+  state.transferDotStyle = SETTINGS.transferDotStyle.defaultValue as TransferDotStyle;
   state.transferDotShape = SETTINGS.transferDotShape.defaultValue as NormalStationDotShape;
   state.transferDotOutlineThickness = SETTINGS.transferDotOutlineThickness.defaultValue as number;
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
@@ -454,7 +495,8 @@ export function resetMarkerAppearance(): void {
   saveValue('normalStationDotShape', state.normalStationDotShape);
   saveValue('normalStationDotOutlineThickness', state.normalStationDotOutlineThickness);
   saveValue('transferDotSize', state.transferDotSize);
-  saveValue('transferDotCapsule', state.transferDotCapsule);
+  saveValue('transferDotTrafficLight', state.transferDotTrafficLight);
+  saveValue('transferDotStyle', state.transferDotStyle);
   saveValue('transferDotShape', state.transferDotShape);
   saveValue('transferDotOutlineThickness', state.transferDotOutlineThickness);
   saveValue('lineBadgeSize', state.lineBadgeSize);
