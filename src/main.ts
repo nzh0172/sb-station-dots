@@ -869,10 +869,12 @@ function applyTransferCapsuleDotStyle(
   dot.style.width = 'max-content';
   dot.style.height = 'auto';
   dot.style.minHeight = `${Math.max(dotSize, dotSize * 1.7)}rem`;
-  dot.style.display = 'flex';
-  dot.style.flexDirection = 'row';
+  dot.style.display = 'grid';
+  dot.style.gridTemplateColumns = `repeat(${Math.min(entries.length, 4)}, max-content)`;
+  dot.style.gridAutoRows = 'max-content';
   dot.style.alignItems = 'center';
   dot.style.justifyContent = 'center';
+  dot.style.justifyItems = 'center';
   dot.style.gap = `${Math.max(2, outlineThickness * globalScale + 1)}px`;
   dot.style.padding = `${Math.max(3, outlineThickness * globalScale + 2)}px`;
   dot.style.boxSizing = 'border-box';
