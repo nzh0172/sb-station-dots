@@ -16,6 +16,7 @@ import {
   type PreserveJoinedTransferNamesOnZoomOut,
   type RouteSortByShape,
   type RouteSortDirection,
+  type SplitRouteCodeFromName,
 } from './markerAppearance';
 
 const MOD_ID = 'com.naz.station-dots';
@@ -110,6 +111,11 @@ type CapsuleStationGroupMatch = {
   groupRouteIds: string[];
   groupRouteLabels: string[];
   stationNameMatches: boolean;
+};
+
+type ParsedRouteName = {
+  code: string;
+  name: string;
 };
 
 function parsePixelValue(value: string | null | undefined): number | null {
@@ -210,7 +216,99 @@ function getStationRecentOrderScore(station: { id: string; createdAt: number }):
   return station.createdAt;
 }
 
-function buildTransferStationGroups(joinTransferNamesOrder: JoinTransferNamesOrder): TransferStationGroup[] {
+function parseRouteNameParts(routeName: string | undefined): ParsedRouteName {
+  const normalizedName = normalizeLabelText(routeName ?? '');
+  const firstSpaceIndex = normalizedName.search(/\s/);
+
+  if (firstSpaceIndex <= 0) {
+    return { code: normalizedName, name: normalizedName };
+  }
+
+  const code = normalizeLabelText(normalizedName.slice(0, firstSpaceIndex));
+  const name = normalizeLabelText(normalizedName.slice(firstSpaceIndex + 1));
+  return {
+    code: code || normalizedName,
+    name: name || normalizedName,
+  };
+}
+
+function getRouteBaseDisplayLabel(route: { bullet?: string; name?: string }): string {
+  return normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '');
+}
+
+function getRouteSplitSource(route: { bullet?: string; name?: string }): string {
+  const name = normalizeLabelText(route.name ?? '');
+  if (/\s/.test(name)) return name;
+
+  const baseDisplayLabel = getRouteBaseDisplayLabel(route);
+  if (/\s/.test(baseDisplayLabel)) return baseDisplayLabel;
+
+  return name || baseDisplayLabel;
+}
+
+function getRouteDisplayLabel(
+  route: { bullet?: string; name?: string },
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): string {
+  if (splitRouteCodeFromName === 'on') {
+    return parseRouteNameParts(getRouteSplitSource(route)).name || getRouteBaseDisplayLabel(route);
+  }
+
+  return getRouteBaseDisplayLabel(route);
+}
+
+function getRouteCapsuleLabel(
+  route: { bullet?: string; name?: string },
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): string {
+  if (splitRouteCodeFromName === 'on') {
+    return parseRouteNameParts(getRouteSplitSource(route)).code || getRouteInitials(route);
+  }
+
+  return getRouteInitials(route);
+}
+
+function buildRouteBadgeDisplayLabelByBaseLabel(splitRouteCodeFromName: SplitRouteCodeFromName): Map<string, string> {
+  if (!api?.gameState) return new Map();
+
+  const displayLabelByBaseLabel = new Map<string, string>();
+  api.gameState.getRoutes().forEach((route) => {
+    const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
+    const splitSource = getRouteSplitSource(route);
+    const parsedName = parseRouteNameParts(splitSource);
+    [getRouteBaseDisplayLabel(route), normalizeLabelText(route.name ?? ''), splitSource, parsedName.code].forEach((baseLabel) => {
+      if (baseLabel.length > 0) {
+        displayLabelByBaseLabel.set(baseLabel, displayLabel);
+      }
+    });
+  });
+
+  return displayLabelByBaseLabel;
+}
+
+function setRouteBadgeDisplayLabels(lineBadges: NodeListOf<HTMLElement>, splitRouteCodeFromName: SplitRouteCodeFromName): void {
+  const routeBadgeDisplayLabelByBaseLabel = buildRouteBadgeDisplayLabelByBaseLabel(splitRouteCodeFromName);
+
+  lineBadges.forEach((badge) => {
+    const label = badge.querySelector<HTMLElement>(':scope > span') ?? badge;
+
+    if (label.dataset.stationDotsBaseRouteLabel === undefined) {
+      label.dataset.stationDotsBaseRouteLabel = normalizeLabelText(label.textContent ?? '');
+    }
+
+    const baseLabel = label.dataset.stationDotsBaseRouteLabel;
+    const displayLabel =
+      splitRouteCodeFromName === 'on' ? routeBadgeDisplayLabelByBaseLabel.get(baseLabel) ?? baseLabel : baseLabel;
+    if (label.textContent !== displayLabel) {
+      label.textContent = displayLabel;
+    }
+  });
+}
+
+function buildTransferStationGroups(
+  joinTransferNamesOrder: JoinTransferNamesOrder,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): TransferStationGroup[] {
   if (!api?.gameState) return [];
 
   const stations = api.gameState.getStations();
@@ -218,7 +316,7 @@ function buildTransferStationGroups(joinTransferNamesOrder: JoinTransferNamesOrd
   const routes = api.gameState.getRoutes();
   const stationById = new Map(stations.map((station) => [station.id, station]));
   const routeBulletById = new Map(
-    routes.map((route) => [route.id, normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '')]),
+    routes.map((route) => [route.id, getRouteDisplayLabel(route, splitRouteCodeFromName)]),
   );
   return stationGroups
     .map((group) => {
@@ -289,10 +387,6 @@ function getMarkerRouteBadgeLabelsInDisplayOrder(marker: HTMLElement): string[] 
     .filter((label) => label.length > 0);
 }
 
-function getRouteDisplayLabel(route: { bullet?: string; name?: string }): string {
-  return normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '');
-}
-
 function getRouteInitials(route: { bullet?: string; name?: string }): string {
   const bullet = normalizeLabelText(route.bullet ?? '');
   if (bullet.length > 0) return bullet;
@@ -361,7 +455,10 @@ function dedupeCapsuleEntriesByRouteLabel(entries: CapsuleTransferEntryWithSort[
   return Array.from(entryByDisplayLabel.values());
 }
 
-function getCapsuleTransferEntries(marker: HTMLElement): CapsuleTransferEntry[] {
+function getCapsuleTransferEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): CapsuleTransferEntry[] {
   if (!api?.gameState) return [];
 
   const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
@@ -392,7 +489,7 @@ function getCapsuleTransferEntries(marker: HTMLElement): CapsuleTransferEntry[] 
         new Set(
           groupRouteIds
             .map((routeId) => routeById.get(routeId))
-            .map((route) => (route ? getRouteDisplayLabel(route) : ''))
+            .map((route) => (route ? getRouteDisplayLabel(route, splitRouteCodeFromName) : ''))
             .filter((label) => label.length > 0),
         ),
       ).sort((left, right) => compareRouteBadgeLabels(left, right));
@@ -417,10 +514,10 @@ function getCapsuleTransferEntries(marker: HTMLElement): CapsuleTransferEntry[] 
     .map((routeId) => routeById.get(routeId))
     .filter((route): route is Route => route !== undefined)
     .map((route): CapsuleTransferEntryWithSort => {
-      const displayLabel = getRouteDisplayLabel(route);
+      const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
 
       return {
-        label: getRouteInitials(route),
+        label: getRouteCapsuleLabel(route, splitRouteCodeFromName),
         stationNumber: getRouteStationNumber(route, matchingGroup.group.stationIds, stationById),
         routeColor: route.color || badgeColorByLabel.get(displayLabel) || '#666666',
         textColor: '#111111',
@@ -441,6 +538,7 @@ function getTransferStationLabel(
   joinTransferNames: JoinTransferNames,
   joinTransferNamesOrder: JoinTransferNamesOrder,
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
   dotKind: 'transfer' | 'station' | null,
 ): string {
   const normalizedFallbackName = normalizeLabelText(fallbackName);
@@ -450,7 +548,7 @@ function getTransferStationLabel(
   const routeBullets = getMarkerRouteBadgeLabels(marker);
   if (routeBullets.length === 0) return normalizedFallbackName;
 
-  const matchingGroup = buildTransferStationGroups(joinTransferNamesOrder).find((group) => {
+  const matchingGroup = buildTransferStationGroups(joinTransferNamesOrder, splitRouteCodeFromName).find((group) => {
     return arraysMatch(group.routeBullets, routeBullets) && group.names.includes(normalizedFallbackName);
   });
 
@@ -1108,13 +1206,13 @@ function applyMarkerAppearance(root: ParentNode): void {
     joinTransferNames,
     joinTransferNamesOrder,
     preserveJoinedTransferNamesOnZoomOut,
+    splitRouteCodeFromName,
     routeIconWrapWidth,
     routeSortByShape,
     routeSortDirection,
     transferDotColor,
     transferDotOutlineColor,
   } = getMarkerAppearance();
-  sortRouteBadges(root, routeSortDirection, routeSortByShape);
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeRows = root.querySelectorAll<HTMLElement>(LINE_BADGE_ROW_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
@@ -1122,6 +1220,9 @@ function applyMarkerAppearance(root: ParentNode): void {
   const editRouteOrderButtonRows = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_ROW_SELECTOR);
   const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
+
+  setRouteBadgeDisplayLabels(lineBadges, splitRouteCodeFromName);
+  sortRouteBadges(root, routeSortDirection, routeSortByShape);
 
   lineBadgeRows.forEach((row) => {
     row.style.display = 'flex';
@@ -1172,6 +1273,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     const scale = metrics.height > 0 ? (effectiveLineBadgeSize * hoverScale) / metrics.height : 1;
 
     badge.style.minWidth = `${metrics.minWidth * scale}px`;
+    badge.style.width = 'max-content';
     badge.style.height = `${effectiveLineBadgeSize * hoverScale}px`;
     badge.style.fontSize = `${Math.max(8, metrics.fontSize * scale)}px`;
     badge.style.paddingLeft = `${Math.max(0, metrics.paddingLeft * scale)}px`;
@@ -1187,6 +1289,7 @@ function applyMarkerAppearance(root: ParentNode): void {
       }
 
       label.style.transform = scalePixelTransforms(label.dataset.stationDotsBaseTransform, scale);
+      label.style.whiteSpace = 'nowrap';
     }
   });
 
@@ -1264,6 +1367,7 @@ function applyMarkerAppearance(root: ParentNode): void {
             joinTransferNames,
             joinTransferNamesOrder,
             preserveJoinedTransferNamesOnZoomOut,
+            splitRouteCodeFromName,
             dotKind,
           )
         : baseName;
@@ -1356,7 +1460,8 @@ function applyMarkerAppearance(root: ParentNode): void {
           globalScale,
         );
       } else if (transferDotStyle === 'capsule') {
-        const capsuleEntries = marker instanceof HTMLElement ? getCapsuleTransferEntries(marker) : [];
+        const capsuleEntries =
+          marker instanceof HTMLElement ? getCapsuleTransferEntries(marker, splitRouteCodeFromName) : [];
         if (capsuleEntries.length > 0) {
           applyTransferCapsuleDotStyle(
             dot,

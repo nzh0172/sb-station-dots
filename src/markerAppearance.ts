@@ -14,6 +14,7 @@ export type MarkerAppearanceKey =
   | 'joinTransferNames'
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
+  | 'splitRouteCodeFromName'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'routeIconWrapWidth'
@@ -29,6 +30,7 @@ type NumericMarkerAppearanceKey = Exclude<
   | 'joinTransferNames'
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
+  | 'splitRouteCodeFromName'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'transferDotColor'
@@ -41,6 +43,7 @@ export type TransferDotTrafficLight = 'off' | 'on';
 export type TransferDotStyle = 'single' | 'trafficLight' | 'bubbly' | 'trinite' | 'capsule';
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
+export type SplitRouteCodeFromName = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
 
@@ -68,6 +71,7 @@ export type MarkerAppearanceState = {
   joinTransferNames: JoinTransferNames;
   joinTransferNamesOrder: JoinTransferNamesOrder;
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut;
+  splitRouteCodeFromName: SplitRouteCodeFromName;
   routeSortDirection: RouteSortDirection;
   routeSortByShape: RouteSortByShape;
   routeIconWrapWidth: number;
@@ -160,6 +164,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: 'off',
     storageKey: 'com.author.modname:preserve-joined-transfer-names-on-zoom-out',
   },
+  splitRouteCodeFromName: {
+    defaultValue: 'off',
+    storageKey: 'com.author.modname:split-route-code-from-name',
+  },
   routeSortDirection: {
     defaultValue: 'original',
     storageKey: 'com.author.modname:route-sort-direction',
@@ -203,6 +211,7 @@ const state: MarkerAppearanceState = {
   joinTransferNames: loadValue('joinTransferNames'),
   joinTransferNamesOrder: loadValue('joinTransferNamesOrder'),
   preserveJoinedTransferNamesOnZoomOut: loadValue('preserveJoinedTransferNamesOnZoomOut'),
+  splitRouteCodeFromName: loadValue('splitRouteCodeFromName'),
   routeSortDirection: loadValue('routeSortDirection'),
   routeSortByShape: loadValue('routeSortByShape'),
   routeIconWrapWidth: loadValue('routeIconWrapWidth'),
@@ -288,6 +297,10 @@ function normalizePreserveJoinedTransferNamesOnZoomOut(value: string): PreserveJ
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeSplitRouteCodeFromName(value: string): SplitRouteCodeFromName {
+  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
@@ -316,6 +329,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'preserveJoinedTransferNamesOnZoomOut') {
     return normalizePreserveJoinedTransferNamesOnZoomOut(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'splitRouteCodeFromName') {
+    return normalizeSplitRouteCodeFromName(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'routeSortDirection') {
@@ -461,6 +478,16 @@ export function setPreserveJoinedTransferNamesOnZoomOut(value: string): void {
   emit();
 }
 
+export function setSplitRouteCodeFromName(value: string): void {
+  const nextValue = normalizeSplitRouteCodeFromName(value);
+
+  if (nextValue === state.splitRouteCodeFromName) return;
+
+  state.splitRouteCodeFromName = nextValue;
+  saveValue('splitRouteCodeFromName', nextValue);
+  emit();
+}
+
 export function setRouteSortByShape(value: string): void {
   const nextValue = normalizeRouteSortByShape(value);
 
@@ -488,6 +515,7 @@ export function resetMarkerAppearance(): void {
   state.joinTransferNamesOrder = SETTINGS.joinTransferNamesOrder.defaultValue as JoinTransferNamesOrder;
   state.preserveJoinedTransferNamesOnZoomOut =
     SETTINGS.preserveJoinedTransferNamesOnZoomOut.defaultValue as PreserveJoinedTransferNamesOnZoomOut;
+  state.splitRouteCodeFromName = SETTINGS.splitRouteCodeFromName.defaultValue as SplitRouteCodeFromName;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
   state.routeSortByShape = SETTINGS.routeSortByShape.defaultValue as RouteSortByShape;
   state.routeIconWrapWidth = SETTINGS.routeIconWrapWidth.defaultValue as number;
@@ -509,6 +537,7 @@ export function resetMarkerAppearance(): void {
   saveValue('joinTransferNames', state.joinTransferNames);
   saveValue('joinTransferNamesOrder', state.joinTransferNamesOrder);
   saveValue('preserveJoinedTransferNamesOnZoomOut', state.preserveJoinedTransferNamesOnZoomOut);
+  saveValue('splitRouteCodeFromName', state.splitRouteCodeFromName);
   saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('routeSortByShape', state.routeSortByShape);
   saveValue('routeIconWrapWidth', state.routeIconWrapWidth);

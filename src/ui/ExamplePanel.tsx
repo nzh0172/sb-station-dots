@@ -9,6 +9,7 @@ import {
   setPreserveJoinedTransferNamesOnZoomOut,
   setRouteSortByShape,
   setRouteSortDirection,
+  setSplitRouteCodeFromName,
   setMarkerAppearanceColor,
   setMarkerAppearanceShape,
   setMarkerAppearanceValue,
@@ -461,6 +462,32 @@ export function TransferDotPanel() {
                     setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
                   }}
                 />
+              </div>
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Split route code from route name</span>
+                  <button
+                    aria-checked={appearance.splitRouteCodeFromName === 'on'}
+                    aria-label="Toggle route code and name split"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.splitRouteCodeFromName === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setSplitRouteCodeFromName(appearance.splitRouteCodeFromName === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.splitRouteCodeFromName === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
               </div>
 
               <div>
