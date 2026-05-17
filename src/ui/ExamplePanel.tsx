@@ -37,9 +37,9 @@ const NORMAL_STATION_DOT_SHAPES = [
 ] as const;
 const TRANSFER_DOT_STYLES = [
   { label: 'Single', value: 'single' },
-  { label: 'Traffic light', value: 'trafficLight' },
+  { label: 'Traffic light', value: 'traffic light' },
   { label: 'Bubbly', value: 'bubbly' },
-  { label: 'Trinite', value: 'trinite' },
+  { label: 'Tri-color', value: 'tri-color' },
   { label: 'Capsule', value: 'capsule' },
 ] as const;
 const ROUTE_SORT_DIRECTIONS = [

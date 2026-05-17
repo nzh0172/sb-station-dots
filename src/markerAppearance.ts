@@ -40,7 +40,7 @@ type NumericMarkerAppearanceKey = Exclude<
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
 export type JoinTransferNames = 'off' | 'on';
 export type TransferDotTrafficLight = 'off' | 'on';
-export type TransferDotStyle = 'single' | 'traffic light' | 'bubbly' | 'trinite' | 'capsule';
+export type TransferDotStyle = 'single' | 'traffic light' | 'bubbly' | 'tri-color' | 'capsule';
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type SplitRouteCodeFromName = 'off' | 'on';
@@ -272,8 +272,8 @@ function normalizeTransferDotStyle(value: string): TransferDotStyle {
       return 'bubbly';
     case 'capsule':
       return 'capsule';
-    case 'trinite':
-      return 'trinite';
+    case 'tri-color':
+      return 'tri-color';
     case 'traffic light':
     case 'traffic-light':
     case 'traffic_light':

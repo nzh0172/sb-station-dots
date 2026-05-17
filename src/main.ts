@@ -1496,7 +1496,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     dot.style.height = `${dotSize}rem`;
 
     if (dotKind === 'transfer') {
-      if (transferDotStyle === 'trafficLight' || (transferDotStyle === 'single' && transferDotTrafficLight === 'on')) {
+      if (transferDotStyle === 'traffic light' || (transferDotStyle === 'single' && transferDotTrafficLight === 'on')) {
         applyTransferTrafficLightDotStyle(
           dot,
           dotSize,
@@ -1516,7 +1516,7 @@ function applyMarkerAppearance(root: ParentNode): void {
           globalScale,
           effectiveRouteColors,
         );
-      } else if (transferDotStyle === 'trinite') {
+      } else if (transferDotStyle === 'tri-color') {
         applyTransferTriniteDotStyle(
           dot,
           dotSize,
