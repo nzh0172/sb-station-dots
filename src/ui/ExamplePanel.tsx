@@ -284,115 +284,134 @@ export function TransferDotPanel() {
                 />
               </div>
 
-              <div className={PANEL_FIELD_CLASS}>
-                <div className={PANEL_FIELD_ROW_CLASS}>
-                  <p className="text-sm font-medium">Dot shape</p>
-                  <div className="min-w-14 text-right font-mono text-sm capitalize">
-                    {appearance.transferDotShape}
-                  </div>
+              {appearance.transferDotStyle === 'capsule' ? (
+                <div className="rounded-md border border-blue-400/40 bg-blue-500/10 p-3 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
+                  <p className="font-medium text-blue-900 dark:text-blue-50">How to make a route code</p>
+                  <p className="mt-1">
+                    Name your route as [Route code] [Route name], only the first space will split the names.
+                  </p>
+                  <p className="mt-1 text-blue-800/80 dark:text-blue-100/80">
+                    ie: PY Putrajaya Line (PY=code, Putrajaya Line=route name)
+                  </p>
+                  <p className="mt-3 font-medium text-blue-900 dark:text-blue-50">Recommendation</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-blue-800/80 dark:text-blue-100/80">
+                    <li>Route is named shorter than three letters as route code</li>
+                    <li>Enable &quot;split route code from route name&quot; in station labels</li>
+                  </ul>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {NORMAL_STATION_DOT_SHAPES.map((shape) => {
-                    const isActive = appearance.transferDotShape === shape.value;
-                    return (
-                      <button
-                        key={`${shape.value}`}
-                        className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
-                          isActive
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border bg-background hover:bg-accent'
-                        }`}
-                        type="button"
-                        onClick={() => {
-                          setMarkerAppearanceShape('transferDotShape', shape.value);
+              ) : (
+                <>
+                  <div className={PANEL_FIELD_CLASS}>
+                    <div className={PANEL_FIELD_ROW_CLASS}>
+                      <p className="text-sm font-medium">Dot shape</p>
+                      <div className="min-w-14 text-right font-mono text-sm capitalize">
+                        {appearance.transferDotShape}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {NORMAL_STATION_DOT_SHAPES.map((shape) => {
+                        const isActive = appearance.transferDotShape === shape.value;
+                        return (
+                          <button
+                            key={`${shape.value}`}
+                            className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                              isActive
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-background hover:bg-accent'
+                            }`}
+                            type="button"
+                            onClick={() => {
+                              setMarkerAppearanceShape('transferDotShape', shape.value);
+                            }}
+                          >
+                            {shape.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className={PANEL_FIELD_CLASS}>
+                    <div className={PANEL_FIELD_ROW_CLASS}>
+                      <p className="text-sm font-medium">Dot color</p>
+                      <span
+                        className="h-6 w-6 rounded-full"
+                        style={{
+                          backgroundColor: appearance.transferDotColor,
                         }}
-                      >
-                        {shape.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      />
+                    </div>
 
-              <div className={PANEL_FIELD_CLASS}>
-                <div className={PANEL_FIELD_ROW_CLASS}>
-                  <p className="text-sm font-medium">Dot color</p>
-                  <span
-                    className="h-6 w-6 rounded-full"
-                    style={{
-                      backgroundColor: appearance.transferDotColor,
-                    }}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
-                    type="color"
-                    value={appearance.transferDotColor}
-                    onChange={(event) => {
-                      setMarkerAppearanceColor('transferDotColor', event.target.value);
-                    }}
-                  />
-                  <input
-                    className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
-                    type="text"
-                    value={appearance.transferDotColor}
-                    onChange={(event) => {
-                      setMarkerAppearanceColor('transferDotColor', event.target.value);
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className={PANEL_FIELD_CLASS}>
-                <div className={PANEL_FIELD_ROW_CLASS}>
-                  <p className="text-sm font-medium">Outline color</p>
-                  <span
-                    className="h-6 w-6 rounded-full border border-border"
-                    style={{ backgroundColor: appearance.transferDotOutlineColor }}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
-                    type="color"
-                    value={appearance.transferDotOutlineColor}
-                    onChange={(event) => {
-                      setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
-                    }}
-                  />
-                  <input
-                    className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
-                    type="text"
-                    value={appearance.transferDotOutlineColor}
-                    onChange={(event) => {
-                      setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Outline thickness</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.transferDotOutlineThickness.toFixed(1)}px
+                    <div className="flex items-center gap-3">
+                      <input
+                        className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+                        type="color"
+                        value={appearance.transferDotColor}
+                        onChange={(event) => {
+                          setMarkerAppearanceColor('transferDotColor', event.target.value);
+                        }}
+                      />
+                      <input
+                        className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+                        type="text"
+                        value={appearance.transferDotColor}
+                        onChange={(event) => {
+                          setMarkerAppearanceColor('transferDotColor', event.target.value);
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <input
-                  className="w-full accent-primary"
-                  type="range"
-                  min={transferDotOutlineThicknessRange.min}
-                  max={transferDotOutlineThicknessRange.max}
-                  step={transferDotOutlineThicknessRange.step}
-                  value={appearance.transferDotOutlineThickness}
-                  onChange={(event) => {
-                    setMarkerAppearanceValue('transferDotOutlineThickness', Number.parseFloat(event.target.value));
-                  }}
-                />
-              </div>
+
+                  <div className={PANEL_FIELD_CLASS}>
+                    <div className={PANEL_FIELD_ROW_CLASS}>
+                      <p className="text-sm font-medium">Outline color</p>
+                      <span
+                        className="h-6 w-6 rounded-full border border-border"
+                        style={{ backgroundColor: appearance.transferDotOutlineColor }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        className="h-10 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
+                        type="color"
+                        value={appearance.transferDotOutlineColor}
+                        onChange={(event) => {
+                          setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+                        }}
+                      />
+                      <input
+                        className="h-10 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm"
+                        type="text"
+                        value={appearance.transferDotOutlineColor}
+                        onChange={(event) => {
+                          setMarkerAppearanceColor('transferDotOutlineColor', event.target.value);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium">Outline thickness</p>
+                      <div className="min-w-14 text-right font-mono text-sm">
+                        {appearance.transferDotOutlineThickness.toFixed(1)}px
+                      </div>
+                    </div>
+                    <input
+                      className="w-full accent-primary"
+                      type="range"
+                      min={transferDotOutlineThicknessRange.min}
+                      max={transferDotOutlineThicknessRange.max}
+                      step={transferDotOutlineThicknessRange.step}
+                      value={appearance.transferDotOutlineThickness}
+                      onChange={(event) => {
+                        setMarkerAppearanceValue('transferDotOutlineThickness', Number.parseFloat(event.target.value));
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -466,7 +485,7 @@ export function TransferDotPanel() {
 
               <div>
                 <label className={PANEL_SWITCH_ROW_CLASS}>
-                  <span className="pr-3 text-sm font-medium">Split route code from route name</span>
+                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule)</span>
                   <button
                     aria-checked={appearance.splitRouteCodeFromName === 'on'}
                     aria-label="Toggle route code and name split"
