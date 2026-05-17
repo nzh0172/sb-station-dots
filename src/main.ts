@@ -888,7 +888,7 @@ function applyTransferCapsuleDotStyle(
     const routeBox = document.createElement('span');
     const routeLabel = document.createElement('span');
     const stationNumber = document.createElement('span');
-    const boxWidth = Math.max(0.82, dotSize * 0.96);
+    const minBoxWidth = Math.max(0.82, dotSize * 0.96);
     const boxHeight = Math.max(1.28, dotSize * 1.52);
 
     routeBox.className = TRANSFER_CAPSULE_DOT_CLASS;
@@ -899,7 +899,8 @@ function applyTransferCapsuleDotStyle(
     routeBox.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)';
     routeBox.style.alignItems = 'center';
     routeBox.style.justifyItems = 'center';
-    routeBox.style.width = `${boxWidth}rem`;
+    routeBox.style.width = 'max-content';
+    routeBox.style.minWidth = `${minBoxWidth}rem`;
     routeBox.style.height = `${boxHeight}rem`;
     routeBox.style.flex = '0 0 auto';
     routeBox.style.border = `${Math.max(1, outlineThickness * globalScale)}px solid ${entry.routeColor}`;
@@ -908,6 +909,8 @@ function applyTransferCapsuleDotStyle(
     routeBox.style.boxSizing = 'border-box';
     routeBox.style.overflow = 'hidden';
     routeBox.style.pointerEvents = 'none';
+    routeBox.style.paddingLeft = `${Math.max(2, dotSize * 2.1 * globalScale)}px`;
+    routeBox.style.paddingRight = `${Math.max(2, dotSize * 2.1 * globalScale)}px`;
 
     routeLabel.textContent = entry.label;
     routeLabel.style.display = 'flex';
