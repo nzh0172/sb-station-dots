@@ -11,6 +11,8 @@ export type MarkerAppearanceKey =
   | 'lineBadgeSize'
   | 'editRouteOrderButtonScale'
   | 'stationNameSize'
+  | 'stationNameLabelsVisible'
+  | 'routeIconLabelsVisible'
   | 'joinTransferNames'
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
@@ -31,6 +33,8 @@ type NumericMarkerAppearanceKey = Exclude<
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
   | 'splitRouteCodeFromName'
+  | 'stationNameLabelsVisible'
+  | 'routeIconLabelsVisible'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'transferDotColor'
@@ -44,6 +48,7 @@ export type TransferDotStyle = 'single' | 'traffic light' | 'bubbly' | 'tri-colo
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type SplitRouteCodeFromName = 'off' | 'on';
+export type LabelVisibility = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
 
@@ -68,6 +73,8 @@ export type MarkerAppearanceState = {
   lineBadgeSize: number;
   editRouteOrderButtonScale: number;
   stationNameSize: number;
+  stationNameLabelsVisible: LabelVisibility;
+  routeIconLabelsVisible: LabelVisibility;
   joinTransferNames: JoinTransferNames;
   joinTransferNamesOrder: JoinTransferNamesOrder;
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut;
@@ -152,6 +159,14 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 1,
     storageKey: 'com.author.modname:station-name-size-px',
   },
+  stationNameLabelsVisible: {
+    defaultValue: 'on',
+    storageKey: 'com.author.modname:station-name-labels-visible',
+  },
+  routeIconLabelsVisible: {
+    defaultValue: 'on',
+    storageKey: 'com.author.modname:route-icon-labels-visible',
+  },
   joinTransferNames: {
     defaultValue: 'off',
     storageKey: 'com.author.modname:join-transfer-names',
@@ -208,6 +223,8 @@ const state: MarkerAppearanceState = {
   lineBadgeSize: loadValue('lineBadgeSize'),
   editRouteOrderButtonScale: loadValue('editRouteOrderButtonScale'),
   stationNameSize: loadValue('stationNameSize'),
+  stationNameLabelsVisible: loadValue('stationNameLabelsVisible'),
+  routeIconLabelsVisible: loadValue('routeIconLabelsVisible'),
   joinTransferNames: loadValue('joinTransferNames'),
   joinTransferNamesOrder: loadValue('joinTransferNamesOrder'),
   preserveJoinedTransferNamesOnZoomOut: loadValue('preserveJoinedTransferNamesOnZoomOut'),
@@ -301,6 +318,10 @@ function normalizeSplitRouteCodeFromName(value: string): SplitRouteCodeFromName 
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeLabelVisibility(value: string): LabelVisibility {
+  return value.trim().toLowerCase() === 'off' ? 'off' : 'on';
+}
+
 function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState[K] {
   const setting = SETTINGS[key];
   const stored = window.localStorage.getItem(setting.storageKey);
@@ -333,6 +354,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'splitRouteCodeFromName') {
     return normalizeSplitRouteCodeFromName(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'stationNameLabelsVisible' || key === 'routeIconLabelsVisible') {
+    return normalizeLabelVisibility(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'routeSortDirection') {
@@ -488,6 +513,16 @@ export function setSplitRouteCodeFromName(value: string): void {
   emit();
 }
 
+export function setLabelVisibility(key: 'stationNameLabelsVisible' | 'routeIconLabelsVisible', value: string): void {
+  const nextValue = normalizeLabelVisibility(value);
+
+  if (nextValue === state[key]) return;
+
+  state[key] = nextValue;
+  saveValue(key, nextValue);
+  emit();
+}
+
 export function setRouteSortByShape(value: string): void {
   const nextValue = normalizeRouteSortByShape(value);
 
@@ -511,6 +546,8 @@ export function resetMarkerAppearance(): void {
   state.lineBadgeSize = SETTINGS.lineBadgeSize.defaultValue as number;
   state.editRouteOrderButtonScale = SETTINGS.editRouteOrderButtonScale.defaultValue as number;
   state.stationNameSize = SETTINGS.stationNameSize.defaultValue as number;
+  state.stationNameLabelsVisible = SETTINGS.stationNameLabelsVisible.defaultValue as LabelVisibility;
+  state.routeIconLabelsVisible = SETTINGS.routeIconLabelsVisible.defaultValue as LabelVisibility;
   state.joinTransferNames = SETTINGS.joinTransferNames.defaultValue as JoinTransferNames;
   state.joinTransferNamesOrder = SETTINGS.joinTransferNamesOrder.defaultValue as JoinTransferNamesOrder;
   state.preserveJoinedTransferNamesOnZoomOut =
@@ -534,6 +571,8 @@ export function resetMarkerAppearance(): void {
   saveValue('lineBadgeSize', state.lineBadgeSize);
   saveValue('editRouteOrderButtonScale', state.editRouteOrderButtonScale);
   saveValue('stationNameSize', state.stationNameSize);
+  saveValue('stationNameLabelsVisible', state.stationNameLabelsVisible);
+  saveValue('routeIconLabelsVisible', state.routeIconLabelsVisible);
   saveValue('joinTransferNames', state.joinTransferNames);
   saveValue('joinTransferNamesOrder', state.joinTransferNamesOrder);
   saveValue('preserveJoinedTransferNamesOnZoomOut', state.preserveJoinedTransferNamesOnZoomOut);

@@ -5,6 +5,7 @@ import {
   getMarkerAppearanceRange,
   resetMarkerAppearance,
   setJoinTransferNames,
+  setLabelVisibility,
   setJoinTransferNamesOrder,
   setPreserveJoinedTransferNamesOnZoomOut,
   setRouteSortByShape,
@@ -19,6 +20,7 @@ import {
 
 const api = window.SubwayBuilderAPI;
 const { Button } = api.utils.components as Record<string, React.ComponentType<any>>;
+const { Eye, EyeOff } = api.utils.icons as Record<string, React.ComponentType<{ className?: string }>>;
 const globalScaleRange = getMarkerAppearanceRange('globalScale');
 const normalStationDotRange = getMarkerAppearanceRange('normalStationDotSize');
 const normalStationDotOutlineThicknessRange = getMarkerAppearanceRange('normalStationDotOutlineThickness');
@@ -56,6 +58,35 @@ const PANEL_SWITCH_ROW_CLASS = 'flex cursor-pointer items-center justify-between
 
 function getTransferDotStyleLabel(value: string): string {
   return TRANSFER_DOT_STYLES.find((style) => style.value === value)?.label ?? value;
+}
+
+function VisibilityIconButton({
+  isVisible,
+  label,
+  onClick,
+}: {
+  isVisible: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const Icon = isVisible ? Eye : EyeOff;
+
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={isVisible}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors ${
+        isVisible
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'border-border bg-muted/60 text-muted-foreground hover:bg-accent'
+      }`}
+      title={label}
+      type="button"
+      onClick={onClick}
+    >
+      {Icon ? <Icon className="h-4 w-4" /> : <span className="text-xs">{isVisible ? 'On' : 'Off'}</span>}
+    </button>
+  );
 }
 
 async function copyEmojiToClipboard(value: string, label: string): Promise<void> {
@@ -286,17 +317,18 @@ export function TransferDotPanel() {
 
               {appearance.transferDotStyle === 'capsule' ? (
                 <div className="rounded-md border border-blue-400/40 bg-blue-500/10 p-3 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
-                  <p className="font-medium text-blue-900 dark:text-blue-50">How to make a route code</p>
+                  <p className="font-small text-blue-900 dark:text-blue-50">How to make a route code</p>
                   <p className="mt-1">
                     Name your route as [Route code] [Route name], only the first space will split the names.
                   </p>
                   <p className="mt-1 text-blue-800/80 dark:text-blue-100/80">
                     ie: PY Putrajaya Line (PY=code, Putrajaya Line=route name)
                   </p>
-                  <p className="mt-3 font-medium text-blue-900 dark:text-blue-50">Recommendation</p>
+                  <p className="mt-3 font-small text-blue-900 dark:text-blue-50">Recommendation</p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-blue-800/80 dark:text-blue-100/80">
                     <li>Route is named shorter than three letters as route code</li>
                     <li>Enable &quot;split route code from route name&quot; in station labels</li>
+                    <li>Disable route icon visibility</li>
                   </ul>
                 </div>
               ) : (
@@ -427,8 +459,20 @@ export function TransferDotPanel() {
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">Route icon size</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.lineBadgeSize}px
+                  <div className="flex items-center gap-2">
+                    <VisibilityIconButton
+                      isVisible={appearance.routeIconLabelsVisible === 'on'}
+                      label="Toggle route icon label visibility"
+                      onClick={() => {
+                        setLabelVisibility(
+                          'routeIconLabelsVisible',
+                          appearance.routeIconLabelsVisible === 'on' ? 'off' : 'on',
+                        );
+                      }}
+                    />
+                    <div className="min-w-14 text-right font-mono text-sm">
+                      {appearance.lineBadgeSize}px
+                    </div>
                   </div>
                 </div>
                 <input
@@ -466,8 +510,20 @@ export function TransferDotPanel() {
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">Station name text size</p>
-                  <div className="min-w-14 text-right font-mono text-sm">
-                    {appearance.stationNameSize}px
+                  <div className="flex items-center gap-2">
+                    <VisibilityIconButton
+                      isVisible={appearance.stationNameLabelsVisible === 'on'}
+                      label="Toggle station name label visibility"
+                      onClick={() => {
+                        setLabelVisibility(
+                          'stationNameLabelsVisible',
+                          appearance.stationNameLabelsVisible === 'on' ? 'off' : 'on',
+                        );
+                      }}
+                    />
+                    <div className="min-w-14 text-right font-mono text-sm">
+                      {appearance.stationNameSize}px
+                    </div>
                   </div>
                 </div>
                 <input
@@ -485,7 +541,7 @@ export function TransferDotPanel() {
 
               <div>
                 <label className={PANEL_SWITCH_ROW_CLASS}>
-                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule)</span>
+                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule style)</span>
                   <button
                     aria-checked={appearance.splitRouteCodeFromName === 'on'}
                     aria-label="Toggle route code and name split"

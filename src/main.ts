@@ -1269,6 +1269,8 @@ function applyMarkerAppearance(root: ParentNode): void {
     lineBadgeSize,
     editRouteOrderButtonScale,
     stationNameSize,
+    stationNameLabelsVisible,
+    routeIconLabelsVisible,
     joinTransferNames,
     joinTransferNamesOrder,
     preserveJoinedTransferNamesOnZoomOut,
@@ -1291,7 +1293,7 @@ function applyMarkerAppearance(root: ParentNode): void {
   sortRouteBadges(root, routeSortDirection, routeSortByShape);
 
   lineBadgeRows.forEach((row) => {
-    row.style.display = 'flex';
+    row.style.display = routeIconLabelsVisible === 'on' ? 'flex' : 'none';
     row.style.flexWrap = 'nowrap';
     row.style.alignItems = 'flex-start';
     row.style.width = 'max-content';
@@ -1360,6 +1362,8 @@ function applyMarkerAppearance(root: ParentNode): void {
   });
 
   lineBadgeRows.forEach((row) => {
+    if (routeIconLabelsVisible !== 'on') return;
+
     const marker = row.closest('.maplibregl-marker');
     const isActive = marker instanceof HTMLElement ? isMarkerActive(marker) : false;
     const hoverScale = isActive ? STATION_NAME_HOVER_SCALE : 1;
@@ -1463,6 +1467,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     name.dataset.stationDotsAppliedName = displayName;
 
     name.style.fontSize = `${stationNameSize * globalScale * hoverScale}px`;
+    name.style.display = stationNameLabelsVisible === 'on' ? '' : 'none';
     name.style.transformOrigin = '';
     name.style.transitionProperty = 'font-size';
     name.style.transitionDuration = `${HOVER_ANIMATION_DURATION_MS}ms`;
