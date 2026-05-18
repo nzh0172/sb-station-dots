@@ -43,6 +43,7 @@ const TRANSFER_DOT_STYLES = [
   { label: 'Bubbly', value: 'bubbly' },
   { label: 'Tri-color', value: 'tri-color' },
   { label: 'Sleek', value: 'sleek' },
+  { label: 'Cycle', value: 'cycle' },
   { label: 'Capsule', value: 'capsule' },
   { label: 'Wormy', value: 'wormy' },
 ] as const;

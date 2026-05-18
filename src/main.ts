@@ -5,8 +5,9 @@
 
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { Route, Station, StationGroup } from './types/game-state';
+import cycleUrl from './data/cycle.png?inline';
 import samtaegukUrl from './data/samtaeguk.png?inline';
-import transferUrl from './data/transfer.png?inline';
+import sleekUrl from './data/sleek.png?inline';
 import { MarkerAppearanceToolbarHost, TransferDotPanel, setToolbarPanelComponent } from './ui/ExamplePanel';
 import {
   getMarkerAppearance,
@@ -1434,7 +1435,42 @@ function applyTransferSleekDotStyle(
   dot.style.boxSizing = 'border-box';
   dot.style.borderRadius = '9999px';
   dot.style.backgroundColor = backgroundColor;
-  dot.style.backgroundImage = `url("${transferUrl}")`;
+  dot.style.backgroundImage = `url("${sleekUrl}")`;
+  dot.style.backgroundPosition = 'center';
+  dot.style.backgroundRepeat = 'no-repeat';
+  dot.style.backgroundSize = 'cover';
+  dot.style.borderColor = outlineColor;
+  dot.style.borderWidth = `${outlineThickness * globalScale}px`;
+  dot.style.overflow = 'hidden';
+  dot.style.position = 'relative';
+  dot.style.filter = '';
+}
+
+function applyTransferCycleDotStyle(
+  dot: HTMLElement,
+  dotSize: number,
+  outlineThickness: number,
+  backgroundColor: string,
+  outlineColor: string,
+  globalScale: number,
+): void {
+  removeTransferCapsuleDots(dot);
+  dot.style.clipPath = '';
+  dot.style.transform = '';
+  dot.style.transformOrigin = 'center';
+  dot.style.width = `${dotSize}rem`;
+  dot.style.height = `${dotSize}rem`;
+  dot.style.minHeight = `${dotSize}rem`;
+  dot.style.display = 'block';
+  dot.style.flexDirection = '';
+  dot.style.alignItems = '';
+  dot.style.justifyContent = '';
+  dot.style.gap = '';
+  dot.style.padding = '0';
+  dot.style.boxSizing = 'border-box';
+  dot.style.borderRadius = '9999px';
+  dot.style.backgroundColor = backgroundColor;
+  dot.style.backgroundImage = `url("${cycleUrl}")`;
   dot.style.backgroundPosition = 'center';
   dot.style.backgroundRepeat = 'no-repeat';
   dot.style.backgroundSize = 'cover';
@@ -1727,6 +1763,15 @@ function applyMarkerAppearance(root: ParentNode): void {
         );
       } else if (transferDotStyle === 'sleek') {
         applyTransferSleekDotStyle(
+          dot,
+          dotSize,
+          transferDotOutlineThickness,
+          transferDotColor,
+          transferDotOutlineColor,
+          globalScale,
+        );
+      } else if (transferDotStyle === 'cycle') {
+        applyTransferCycleDotStyle(
           dot,
           dotSize,
           transferDotOutlineThickness,
