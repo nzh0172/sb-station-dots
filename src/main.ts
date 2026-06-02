@@ -37,6 +37,8 @@ const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duratio
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
 const STATION_NAME_HOVER_SCALE = 1.1;
 const TRANSFER_CAPSULE_LABEL_GAP_PX = 4;
+const NORMAL_STATION_DOT_ZOOMED_OUT_SIZE_FACTOR = 0.72;
+const NORMAL_STATION_DOT_DETAIL_MIN_ZOOM_FALLBACK = 12;
 const HOVER_ANIMATION_DURATION_MS = 0;
 const HOVER_ANIMATION_EASING = 'ease-out';
 
@@ -45,6 +47,9 @@ const CLEANUP_KEY = '__markerAppearanceCleanup';
 const TOOLBAR_PANEL_TITLE = 'Station Dots';
 const TRANSFER_CAPSULE_DOT_CLASS = 'station-dots-transfer-capsule-dot';
 const TRANSFER_CAPSULE_ROW_CLASS = 'station-dots-transfer-capsule-row';
+const CAPSULE_ENTRIES_CACHE_KEY = 'stationDotsCapsuleCache';
+const CAPSULE_ENTRIES_CACHE_SPLIT_KEY = 'stationDotsCapsuleCacheSplit';
+const ROUTE_COLOR_CACHE_KEY = 'stationDotsRouteColor';
 
 type CleanupHandle = {
   observer?: MutationObserver;
@@ -56,6 +61,7 @@ type CleanupHandle = {
 let isApplyingMarkerAppearance = false;
 let currentMapZoom = Number.NaN;
 let previousMapZoom = Number.NaN;
+let normalStationDotDetailMinZoom = NORMAL_STATION_DOT_DETAIL_MIN_ZOOM_FALLBACK;
 
 type LineBadgeMetrics = {
   height: number;
@@ -546,6 +552,192 @@ function getCapsuleTransferEntries(
     .map(({ label, stationNumber, routeColor, textColor }): CapsuleTransferEntry => ({ label, stationNumber, routeColor, textColor }));
 }
 
+function getRouteBadgeColorByLabel(marker: HTMLElement): Map<string, string> {
+  return new Map(
+    Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR)).map((badge) => [
+      normalizeLabelText(badge.textContent ?? ''),
+      normalizeColor(badge.style.backgroundColor || getComputedStyle(badge).backgroundColor),
+    ]),
+  );
+}
+
+function buildCapsuleEntriesForStation(
+  station: Station,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  stationById: Map<string, Station>,
+  routeById: Map<string, Route>,
+  badgeColorByLabel: Map<string, string>,
+  markerRouteLabelOrder: Map<string, number>,
+  routeLabelFilter: string[] | null,
+): CapsuleTransferEntry[] {
+  const entries = station.routeIds
+    .map((routeId) => routeById.get(routeId))
+    .filter((route): route is Route => route !== undefined)
+    .map((route): CapsuleTransferEntryWithSort => {
+      const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
+      const routeColor = route.color || badgeColorByLabel.get(displayLabel) || '#666666';
+
+      return {
+        label: getRouteCapsuleLabel(route, splitRouteCodeFromName),
+        stationNumber: getRouteStationNumber(route, [station.id], stationById),
+        routeColor,
+        textColor: route.textColor || getReadableTextColor(routeColor),
+        displayOrder: markerRouteLabelOrder.get(displayLabel) ?? Number.MAX_SAFE_INTEGER,
+        displayLabel,
+      };
+    })
+    .filter((entry) => routeLabelFilter === null || routeLabelFilter.includes(entry.displayLabel));
+
+  return dedupeCapsuleEntriesByRouteLabel(entries)
+    .sort((left, right) => left.displayOrder - right.displayOrder || compareRouteBadgeLabels(left.displayLabel, right.displayLabel))
+    .map(({ label, stationNumber, routeColor, textColor }): CapsuleTransferEntry => ({ label, stationNumber, routeColor, textColor }));
+}
+
+function getCapsuleStationEntriesByName(
+  markerStationName: string,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  badgeColorByLabel: Map<string, string>,
+): CapsuleTransferEntry[] {
+  if (!api?.gameState) return [];
+
+  const routes = api.gameState.getRoutes();
+  const stations = api.gameState.getStations();
+  const routeById = new Map(routes.map((route) => [route.id, route]));
+  const stationById = new Map(stations.map((station) => [station.id, station]));
+  const normalizedMarkerStationName = normalizeLabelText(markerStationName);
+  if (normalizedMarkerStationName.length === 0) return [];
+
+  const station = stations
+    .filter((entry) => normalizeLabelText(entry.name) === normalizedMarkerStationName)
+    .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left))[0];
+  if (!station) return [];
+
+  return buildCapsuleEntriesForStation(
+    station,
+    splitRouteCodeFromName,
+    stationById,
+    routeById,
+    badgeColorByLabel,
+    new Map(),
+    null,
+  );
+}
+
+function getCapsuleStationEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): CapsuleTransferEntry[] {
+  if (!api?.gameState) return [];
+
+  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
+  const markerStationName = getMarkerStationBaseName(marker);
+  const routes = api.gameState.getRoutes();
+  const stations = api.gameState.getStations();
+  const routeById = new Map(routes.map((route) => [route.id, route]));
+  const stationById = new Map(stations.map((station) => [station.id, station]));
+  const markerRouteLabelsInDisplayOrder = getMarkerRouteBadgeLabelsInDisplayOrder(marker);
+  const markerRouteLabelOrder = new Map(markerRouteLabelsInDisplayOrder.map((label, index) => [label, index]));
+  const badgeColorByLabel = getRouteBadgeColorByLabel(marker);
+
+  if (markerRouteLabels.length > 0) {
+    const matchingStations = stations
+      .filter((station) => {
+        const stationRouteLabels = Array.from(
+          new Set(
+            station.routeIds
+              .map((routeId) => routeById.get(routeId))
+              .map((route) => (route ? getRouteDisplayLabel(route, splitRouteCodeFromName) : ''))
+              .filter((label) => label.length > 0),
+          ),
+        ).sort((left, right) => compareRouteBadgeLabels(left, right));
+
+        if (!arraysMatch(stationRouteLabels, markerRouteLabels)) return false;
+        if (markerStationName.length === 0) return true;
+
+        return normalizeLabelText(station.name) === markerStationName;
+      })
+      .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left));
+
+    const station = matchingStations[0];
+    if (station) {
+      const entries = buildCapsuleEntriesForStation(
+        station,
+        splitRouteCodeFromName,
+        stationById,
+        routeById,
+        badgeColorByLabel,
+        markerRouteLabelOrder,
+        markerRouteLabels,
+      );
+      if (entries.length > 0) return entries;
+    }
+  }
+
+  return getCapsuleStationEntriesByName(markerStationName, splitRouteCodeFromName, badgeColorByLabel);
+}
+
+function isCapsuleTransferEntry(value: unknown): value is CapsuleTransferEntry {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const entry = value as Partial<CapsuleTransferEntry>;
+  return (
+    typeof entry.label === 'string' &&
+    typeof entry.stationNumber === 'string' &&
+    typeof entry.routeColor === 'string' &&
+    typeof entry.textColor === 'string'
+  );
+}
+
+function cacheMarkerCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  entries: CapsuleTransferEntry[],
+): void {
+  if (entries.length === 0) return;
+
+  marker.dataset[CAPSULE_ENTRIES_CACHE_KEY] = JSON.stringify(entries);
+  marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] = splitRouteCodeFromName;
+}
+
+function getCachedMarkerCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): CapsuleTransferEntry[] {
+  if (marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] !== splitRouteCodeFromName) return [];
+
+  const rawCache = marker.dataset[CAPSULE_ENTRIES_CACHE_KEY];
+  if (!rawCache) return [];
+
+  try {
+    const parsed = JSON.parse(rawCache) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isCapsuleTransferEntry);
+  } catch {
+    return [];
+  }
+}
+
+function getMarkerCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): CapsuleTransferEntry[] {
+  const transferEntries = getCapsuleTransferEntries(marker, splitRouteCodeFromName);
+  if (transferEntries.length > 0) {
+    cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, transferEntries);
+    return transferEntries;
+  }
+
+  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
+  if (stationEntries.length > 0) {
+    cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
+    cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, stationEntries);
+    return stationEntries;
+  }
+
+  return getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
+}
+
 function getTransferStationLabel(
   marker: HTMLElement,
   fallbackName: string,
@@ -886,25 +1078,42 @@ function isTransferDot(dot: HTMLElement): boolean {
   );
 }
 
+function captureNativeTransferState(dot: HTMLElement): boolean {
+  if (dot.dataset.stationDotsNativeTransfer === 'yes') return true;
+  if (dot.dataset.stationDotsNativeTransfer === 'no') return false;
+
+  const isNativeTransfer = isTransferDot(dot);
+  dot.dataset.stationDotsNativeTransfer = isNativeTransfer ? 'yes' : 'no';
+  return isNativeTransfer;
+}
+
 function getDotKind(dot: HTMLElement): 'transfer' | 'station' | null {
   if (!isStationMarkerDot(dot)) {
     delete dot.dataset.stationDotsKind;
+    delete dot.dataset.stationDotsNativeTransfer;
     return null;
   }
 
+  if (dot.dataset.stationDotsKind === 'station' || dot.dataset.stationDotsNativeTransfer === 'no') {
+    dot.dataset.stationDotsKind = 'station';
+    return 'station';
+  }
+
+  const isNativeTransfer = captureNativeTransferState(dot);
+
   if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`)) {
-    dot.dataset.stationDotsKind = 'transfer';
-    return 'transfer';
+    if (isNativeTransfer) {
+      dot.dataset.stationDotsKind = 'transfer';
+      return 'transfer';
+    }
+
+    dot.dataset.stationDotsKind = 'station';
+    return 'station';
   }
 
-  if (isTransferDot(dot)) {
+  if (isNativeTransfer) {
     dot.dataset.stationDotsKind = 'transfer';
     return 'transfer';
-  }
-
-  const cachedKind = dot.dataset.stationDotsKind;
-  if (cachedKind === 'transfer' || cachedKind === 'station') {
-    return cachedKind;
   }
 
   dot.dataset.stationDotsKind = 'station';
@@ -952,6 +1161,138 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
   }
 
   dot.style.borderRadius = '9999px';
+}
+
+function updateNormalStationDotDetailMinZoom(map: MapLibreMap): void {
+  const minZoom = map.getMinZoom();
+  const maxZoom = map.getMaxZoom();
+  if (!Number.isFinite(minZoom) || !Number.isFinite(maxZoom) || maxZoom <= minZoom) {
+    normalStationDotDetailMinZoom = NORMAL_STATION_DOT_DETAIL_MIN_ZOOM_FALLBACK;
+    return;
+  }
+
+  normalStationDotDetailMinZoom = minZoom + (maxZoom - minZoom) * 0.55;
+}
+
+function isNormalStationDotZoomedOut(): boolean {
+  return Number.isFinite(currentMapZoom) && currentMapZoom < normalStationDotDetailMinZoom;
+}
+
+function cacheMarkerRouteColor(marker: HTMLElement, routeColor: string): void {
+  const normalizedColor = normalizeColor(routeColor);
+  if (normalizedColor.length > 0 && normalizedColor !== 'transparent' && normalizedColor !== 'rgba(0,0,0,0)') {
+    marker.dataset[ROUTE_COLOR_CACHE_KEY] = normalizedColor;
+  }
+}
+
+function getCachedMarkerRouteColor(marker: HTMLElement): string | null {
+  const cachedColor = marker.dataset[ROUTE_COLOR_CACHE_KEY];
+  if (!cachedColor) return null;
+
+  const normalizedColor = normalizeColor(cachedColor);
+  if (normalizedColor.length === 0 || normalizedColor === 'transparent' || normalizedColor === 'rgba(0,0,0,0)') {
+    return null;
+  }
+
+  return normalizedColor;
+}
+
+function getNormalStationRouteColorFromGameState(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): string | null {
+  if (!api?.gameState) return null;
+
+  const markerStationName = getMarkerStationBaseName(marker);
+  if (markerStationName.length === 0) return null;
+
+  const routes = api.gameState.getRoutes();
+  const stations = api.gameState.getStations();
+  const routeById = new Map(routes.map((route) => [route.id, route]));
+  const normalizedName = normalizeLabelText(markerStationName);
+  const station = stations
+    .filter((entry) => normalizeLabelText(entry.name) === normalizedName)
+    .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left))[0];
+  if (!station || station.routeIds.length === 0) return null;
+
+  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
+  if (markerRouteLabels.length > 0) {
+    for (const routeId of station.routeIds) {
+      const route = routeById.get(routeId);
+      if (!route?.color) continue;
+
+      const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
+      if (markerRouteLabels.includes(displayLabel)) {
+        return route.color;
+      }
+    }
+  }
+
+  for (const routeId of station.routeIds) {
+    const route = routeById.get(routeId);
+    if (route?.color) return route.color;
+  }
+
+  return null;
+}
+
+function getNormalStationRouteColor(marker: HTMLElement, splitRouteCodeFromName: SplitRouteCodeFromName): string {
+  const badgeColors = getMarkerRouteBadgeColors(marker);
+  if (badgeColors.length > 0) {
+    cacheMarkerRouteColor(marker, badgeColors[0]);
+    return badgeColors[0];
+  }
+
+  const cachedColor = getCachedMarkerRouteColor(marker);
+  if (cachedColor) return cachedColor;
+
+  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
+  if (stationEntries.length > 0) {
+    cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
+    return stationEntries[0].routeColor;
+  }
+
+  const gameStateColor = getNormalStationRouteColorFromGameState(marker, splitRouteCodeFromName);
+  if (gameStateColor) {
+    cacheMarkerRouteColor(marker, gameStateColor);
+    return gameStateColor;
+  }
+
+  return '#666666';
+}
+
+function applyNormalStationRouteFill(dot: HTMLElement, routeColor: string): void {
+  dot.style.backgroundColor = routeColor;
+  dot.style.borderColor = 'transparent';
+  dot.style.borderWidth = '0';
+  dot.style.boxSizing = 'border-box';
+}
+
+function pinNormalStationDotKind(dot: HTMLElement): void {
+  dot.dataset.stationDotsKind = 'station';
+  dot.dataset.stationDotsNativeTransfer = 'no';
+}
+
+function applyNormalStationColoredDot(
+  dot: HTMLElement,
+  marker: HTMLElement | null,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  shape: NormalStationDotShape,
+): void {
+  pinNormalStationDotKind(dot);
+  applyNormalStationDotShape(dot, shape);
+  const routeColor = marker ? getNormalStationRouteColor(marker, splitRouteCodeFromName) : '#666666';
+  applyNormalStationRouteFill(dot, routeColor);
+}
+
+function applyNormalStationZoomedOutDotStyle(dot: HTMLElement, marker: HTMLElement, dotSize: number, splitRouteCodeFromName: SplitRouteCodeFromName): void {
+  pinNormalStationDotKind(dot);
+  applyNormalStationDotShape(dot, 'circle');
+
+  const zoomedOutSize = dotSize * NORMAL_STATION_DOT_ZOOMED_OUT_SIZE_FACTOR;
+  dot.style.width = `${zoomedOutSize}rem`;
+  dot.style.height = `${zoomedOutSize}rem`;
+  applyNormalStationRouteFill(dot, getNormalStationRouteColor(marker, splitRouteCodeFromName));
 }
 
 function applyTransferTrafficLightDotStyle(
@@ -1781,7 +2122,7 @@ function applyMarkerAppearance(root: ParentNode): void {
         );
       } else if (transferDotStyle === 'wormy') {
         const gummyEntries =
-          marker instanceof HTMLElement ? getCapsuleTransferEntries(marker, splitRouteCodeFromName) : [];
+          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
         if (gummyEntries.length > 0) {
           applyTransferGummyWormDotStyle(
             dot,
@@ -1803,7 +2144,7 @@ function applyMarkerAppearance(root: ParentNode): void {
         }
       } else if (transferDotStyle === 'capsule') {
         const capsuleEntries =
-          marker instanceof HTMLElement ? getCapsuleTransferEntries(marker, splitRouteCodeFromName) : [];
+          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
         if (capsuleEntries.length > 0) {
           applyTransferCapsuleDotStyle(
             dot,
@@ -1831,9 +2172,75 @@ function applyMarkerAppearance(root: ParentNode): void {
         dot.style.borderWidth = `${transferDotOutlineThickness * globalScale}px`;
       }
     } else {
-      applyNormalStationDotShape(dot, normalStationDotShape);
-      dot.style.borderColor = '';
-      dot.style.borderWidth = `${normalStationDotOutlineThickness * globalScale}px`;
+      pinNormalStationDotKind(dot);
+
+      const useCapsuleDotStyle = transferDotStyle === 'wormy' || transferDotStyle === 'capsule';
+      const useZoomedOutNormalDot = useCapsuleDotStyle && isNormalStationDotZoomedOut();
+
+      if (useZoomedOutNormalDot && marker instanceof HTMLElement) {
+        applyNormalStationZoomedOutDotStyle(dot, marker, dotSize, splitRouteCodeFromName);
+      } else if (transferDotStyle === 'wormy') {
+        const gummyEntries =
+          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
+        if (gummyEntries.length > 0) {
+          pinNormalStationDotKind(dot);
+          if (marker instanceof HTMLElement) {
+            cacheMarkerRouteColor(marker, gummyEntries[0].routeColor);
+          }
+          applyTransferGummyWormDotStyle(
+            dot,
+            dotSize,
+            normalStationDotOutlineThickness,
+            globalScale,
+            lineBadgeSize,
+            gummyEntries,
+          );
+          if (marker instanceof HTMLElement) {
+            tightenCapsuleLabelSpacing(marker, dot, globalScale);
+            placeStationNameAboveTransferDot(marker, dot, globalScale);
+          }
+        } else {
+          applyNormalStationColoredDot(
+            dot,
+            marker instanceof HTMLElement ? marker : null,
+            splitRouteCodeFromName,
+            normalStationDotShape,
+          );
+        }
+      } else if (transferDotStyle === 'capsule') {
+        const capsuleEntries =
+          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
+        if (capsuleEntries.length > 0) {
+          pinNormalStationDotKind(dot);
+          applyTransferCapsuleDotStyle(
+            dot,
+            dotSize,
+            normalStationDotOutlineThickness,
+            'transparent',
+            transferDotOutlineColor,
+            globalScale,
+            capsuleEntries,
+          );
+          if (marker instanceof HTMLElement) {
+            tightenCapsuleLabelSpacing(marker, dot, globalScale);
+            placeStationNameAboveTransferDot(marker, dot, globalScale);
+          }
+        } else {
+          applyNormalStationColoredDot(
+            dot,
+            marker instanceof HTMLElement ? marker : null,
+            splitRouteCodeFromName,
+            normalStationDotShape,
+          );
+        }
+      } else {
+        applyNormalStationColoredDot(
+          dot,
+          marker instanceof HTMLElement ? marker : null,
+          splitRouteCodeFromName,
+          normalStationDotShape,
+        );
+      }
     }
   });
 
@@ -1858,10 +2265,19 @@ function hasMarkerAppearanceToolbarButton(): boolean {
   return document.querySelector(`[title="${TOOLBAR_PANEL_TITLE}"]`) !== null;
 }
 
+function resetStationDotClassificationState(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR).forEach((dot) => {
+    delete dot.dataset.stationDotsKind;
+    delete dot.dataset.stationDotsNativeTransfer;
+  });
+}
+
 function installMarkerAppearanceController(map: MapLibreMap): void {
   cleanupPreviousInstall();
+  updateNormalStationDotDetailMinZoom(map);
   currentMapZoom = map.getZoom();
   previousMapZoom = currentMapZoom;
+  resetStationDotClassificationState(document);
   applyMarkerAppearance(document);
   const pendingMarkers = new Set<HTMLElement>();
   let flushScheduled = false;
@@ -1961,12 +2377,25 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
     previousMapZoom = currentMapZoom;
   };
 
+  let zoomAppearanceFrame = 0;
+  const scheduleZoomAppearanceRefresh = () => {
+    currentMapZoom = map.getZoom();
+    cancelAnimationFrame(zoomAppearanceFrame);
+    zoomAppearanceFrame = requestAnimationFrame(() => {
+      zoomAppearanceFrame = 0;
+      applyMarkerAppearance(document);
+    });
+  };
+
   const handleZoomEnd = () => {
+    cancelAnimationFrame(zoomAppearanceFrame);
+    zoomAppearanceFrame = 0;
     currentMapZoom = map.getZoom();
     applyMarkerAppearance(document);
   };
 
   map.on('zoomstart', handleZoomStart);
+  map.on('zoom', scheduleZoomAppearanceRefresh);
   map.on('zoomend', handleZoomEnd);
 
   (window as Window & { [CLEANUP_KEY]?: CleanupHandle })[CLEANUP_KEY] = {
@@ -1979,7 +2408,9 @@ function installMarkerAppearanceController(map: MapLibreMap): void {
       document.removeEventListener('focusout', reapplyForInteraction, true);
     },
     removeMapListeners: () => {
+      cancelAnimationFrame(zoomAppearanceFrame);
       map.off('zoomstart', handleZoomStart);
+      map.off('zoom', scheduleZoomAppearanceRefresh);
       map.off('zoomend', handleZoomEnd);
     },
   };
