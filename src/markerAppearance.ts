@@ -3,6 +3,7 @@ export type MarkerAppearanceKey =
   | 'normalStationDotSize'
   | 'normalStationDotShape'
   | 'normalStationDotOutlineThickness'
+  | 'normalStationDotWormyRouteCodes'
   | 'transferDotSize'
   | 'transferDotTrafficLight'
   | 'transferDotStyle'
@@ -26,6 +27,7 @@ export type MarkerAppearanceKey =
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
   | 'normalStationDotShape'
+  | 'normalStationDotWormyRouteCodes'
   | 'transferDotTrafficLight'
   | 'transferDotStyle'
   | 'transferDotShape'
@@ -42,6 +44,7 @@ type NumericMarkerAppearanceKey = Exclude<
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
+export type NormalStationDotWormyRouteCodes = 'off' | 'on';
 export type JoinTransferNames = 'off' | 'on';
 export type TransferDotTrafficLight = 'off' | 'on';
 export type TransferDotStyle =
@@ -73,6 +76,7 @@ export type MarkerAppearanceState = {
   normalStationDotSize: number;
   normalStationDotShape: NormalStationDotShape;
   normalStationDotOutlineThickness: number;
+  normalStationDotWormyRouteCodes: NormalStationDotWormyRouteCodes;
   transferDotSize: number;
   transferDotTrafficLight: TransferDotTrafficLight;
   transferDotStyle: TransferDotStyle;
@@ -119,6 +123,10 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     max: 6,
     step: 0.5,
     storageKey: 'com.author.modname:normal-station-dot-outline-thickness-px',
+  },
+  normalStationDotWormyRouteCodes: {
+    defaultValue: 'off',
+    storageKey: 'com.author.modname:normal-station-dot-wormy-route-codes',
   },
   transferDotSize: {
     defaultValue: 0.8,
@@ -223,6 +231,7 @@ const state: MarkerAppearanceState = {
   normalStationDotSize: loadValue('normalStationDotSize'),
   normalStationDotShape: loadValue('normalStationDotShape'),
   normalStationDotOutlineThickness: loadValue('normalStationDotOutlineThickness'),
+  normalStationDotWormyRouteCodes: loadValue('normalStationDotWormyRouteCodes'),
   transferDotSize: loadValue('transferDotSize'),
   transferDotTrafficLight: loadValue('transferDotTrafficLight'),
   transferDotShape: loadValue('transferDotShape'),
@@ -335,6 +344,10 @@ function normalizeSplitRouteCodeFromName(value: string): SplitRouteCodeFromName 
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeNormalStationDotWormyRouteCodes(value: string): NormalStationDotWormyRouteCodes {
+  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
+}
+
 function normalizeLabelVisibility(value: string): LabelVisibility {
   return value.trim().toLowerCase() === 'off' ? 'off' : 'on';
 }
@@ -371,6 +384,10 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
 
   if (key === 'splitRouteCodeFromName') {
     return normalizeSplitRouteCodeFromName(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'normalStationDotWormyRouteCodes') {
+    return normalizeNormalStationDotWormyRouteCodes(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'stationNameLabelsVisible' || key === 'routeIconLabelsVisible') {
@@ -530,6 +547,16 @@ export function setSplitRouteCodeFromName(value: string): void {
   emit();
 }
 
+export function setNormalStationDotWormyRouteCodes(value: string): void {
+  const nextValue = normalizeNormalStationDotWormyRouteCodes(value);
+
+  if (nextValue === state.normalStationDotWormyRouteCodes) return;
+
+  state.normalStationDotWormyRouteCodes = nextValue;
+  saveValue('normalStationDotWormyRouteCodes', nextValue);
+  emit();
+}
+
 export function setLabelVisibility(key: 'stationNameLabelsVisible' | 'routeIconLabelsVisible', value: string): void {
   const nextValue = normalizeLabelVisibility(value);
 
@@ -555,6 +582,8 @@ export function resetMarkerAppearance(): void {
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
   state.normalStationDotShape = SETTINGS.normalStationDotShape.defaultValue as NormalStationDotShape;
   state.normalStationDotOutlineThickness = SETTINGS.normalStationDotOutlineThickness.defaultValue as number;
+  state.normalStationDotWormyRouteCodes =
+    SETTINGS.normalStationDotWormyRouteCodes.defaultValue as NormalStationDotWormyRouteCodes;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
   state.transferDotTrafficLight = SETTINGS.transferDotTrafficLight.defaultValue as TransferDotTrafficLight;
   state.transferDotStyle = SETTINGS.transferDotStyle.defaultValue as TransferDotStyle;
@@ -580,6 +609,7 @@ export function resetMarkerAppearance(): void {
   saveValue('normalStationDotSize', state.normalStationDotSize);
   saveValue('normalStationDotShape', state.normalStationDotShape);
   saveValue('normalStationDotOutlineThickness', state.normalStationDotOutlineThickness);
+  saveValue('normalStationDotWormyRouteCodes', state.normalStationDotWormyRouteCodes);
   saveValue('transferDotSize', state.transferDotSize);
   saveValue('transferDotTrafficLight', state.transferDotTrafficLight);
   saveValue('transferDotStyle', state.transferDotStyle);
