@@ -16,6 +16,7 @@ import {
   type JoinTransferNamesOrder,
   type NormalStationDotShape,
   type PreserveJoinedTransferNamesOnZoomOut,
+  type PreserveNormalStationRouteCodesOnZoomOut,
   type RouteSortByShape,
   type RouteSortDirection,
   type SplitRouteCodeFromName,
@@ -37,6 +38,8 @@ const STATION_NAME_SELECTOR = '.maplibregl-marker p.transition-transform.duratio
 const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-start.ml-0';
 const STATION_NAME_HOVER_SCALE = 1.1;
 const TRANSFER_CAPSULE_LABEL_GAP_PX = 4;
+const NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM = 13;
+const NORMAL_STATION_DOT_ZOOMED_OUT_SIZE_FACTOR = 0.72;
 const HOVER_ANIMATION_DURATION_MS = 0;
 const HOVER_ANIMATION_EASING = 'ease-out';
 
@@ -1378,6 +1381,29 @@ function applyNormalStationColoredDot(
   applyNormalStationRouteFill(dot, routeColor);
 }
 
+function shouldShowNormalStationWormyRouteCodes(
+  preserveNormalStationRouteCodesOnZoomOut: PreserveNormalStationRouteCodesOnZoomOut,
+): boolean {
+  if (preserveNormalStationRouteCodesOnZoomOut === 'on') return true;
+
+  return Number.isFinite(currentMapZoom) && currentMapZoom >= NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM;
+}
+
+function applyNormalStationZoomedOutDotStyle(
+  dot: HTMLElement,
+  marker: HTMLElement,
+  dotSize: number,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): void {
+  pinNormalStationDotKind(dot);
+  applyNormalStationDotShape(dot, 'circle');
+
+  const zoomedOutSize = dotSize * NORMAL_STATION_DOT_ZOOMED_OUT_SIZE_FACTOR;
+  dot.style.width = `${zoomedOutSize}rem`;
+  dot.style.height = `${zoomedOutSize}rem`;
+  applyNormalStationRouteFill(dot, getNormalStationRouteColor(marker, splitRouteCodeFromName));
+}
+
 function applyTransferTrafficLightDotStyle(
   dot: HTMLElement,
   dotSize: number,
@@ -1913,6 +1939,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     normalStationDotShape,
     normalStationDotOutlineThickness,
     normalStationDotWormyRouteCodes,
+    preserveNormalStationRouteCodesOnZoomOut,
     transferDotSize,
     transferDotTrafficLight,
     transferDotStyle,
@@ -2260,32 +2287,38 @@ function applyMarkerAppearance(root: ParentNode): void {
       }
     } else {
       if (normalStationDotWormyRouteCodes === 'on') {
-        const gummyEntries =
-          marker instanceof HTMLElement ? getNormalStationWormyEntries(marker, splitRouteCodeFromName) : [];
-        if (gummyEntries.length > 0) {
-          pinNormalStationDotKind(dot);
-          if (marker instanceof HTMLElement) {
-            cacheMarkerRouteColor(marker, gummyEntries[0].routeColor);
-          }
-          applyTransferGummyWormDotStyle(
-            dot,
-            dotSize,
-            normalStationDotOutlineThickness,
-            globalScale,
-            lineBadgeSize,
-            gummyEntries,
-          );
-          if (marker instanceof HTMLElement) {
-            tightenCapsuleLabelSpacing(marker, dot, globalScale);
-            placeStationNameAboveTransferDot(marker, dot, globalScale);
-          }
+        const showWormyRouteCodes = shouldShowNormalStationWormyRouteCodes(preserveNormalStationRouteCodesOnZoomOut);
+
+        if (!showWormyRouteCodes && marker instanceof HTMLElement) {
+          applyNormalStationZoomedOutDotStyle(dot, marker, dotSize, splitRouteCodeFromName);
         } else {
-          applyNormalStationColoredDot(
-            dot,
-            marker instanceof HTMLElement ? marker : null,
-            splitRouteCodeFromName,
-            normalStationDotShape,
-          );
+          const gummyEntries =
+            marker instanceof HTMLElement ? getNormalStationWormyEntries(marker, splitRouteCodeFromName) : [];
+          if (gummyEntries.length > 0) {
+            pinNormalStationDotKind(dot);
+            if (marker instanceof HTMLElement) {
+              cacheMarkerRouteColor(marker, gummyEntries[0].routeColor);
+            }
+            applyTransferGummyWormDotStyle(
+              dot,
+              dotSize,
+              normalStationDotOutlineThickness,
+              globalScale,
+              lineBadgeSize,
+              gummyEntries,
+            );
+            if (marker instanceof HTMLElement) {
+              tightenCapsuleLabelSpacing(marker, dot, globalScale);
+              placeStationNameAboveTransferDot(marker, dot, globalScale);
+            }
+          } else {
+            applyNormalStationColoredDot(
+              dot,
+              marker instanceof HTMLElement ? marker : null,
+              splitRouteCodeFromName,
+              normalStationDotShape,
+            );
+          }
         }
       } else {
         applyNormalStationColoredDot(

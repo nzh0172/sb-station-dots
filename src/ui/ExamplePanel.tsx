@@ -15,6 +15,7 @@ import {
   setMarkerAppearanceShape,
   setMarkerAppearanceValue,
   setNormalStationDotWormyRouteCodes,
+  setPreserveNormalStationRouteCodesOnZoomOut,
   setTransferDotStyle,
   subscribeMarkerAppearance,
 } from '../markerAppearance';
@@ -240,7 +241,7 @@ export function TransferDotPanel() {
 
               <div>
                 <label className={PANEL_SWITCH_ROW_CLASS}>
-                  <span className="pr-3 text-sm font-medium">Wormy route codes</span>
+                  <span className="pr-3 text-sm font-medium">Apply route codes</span>
                   <button
                     aria-checked={appearance.normalStationDotWormyRouteCodes === 'on'}
                     aria-label="Toggle wormy route codes on normal station dots"
@@ -266,13 +267,42 @@ export function TransferDotPanel() {
                 </label>
               </div>
 
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Preserve route codes on zoom out</span>
+                  <button
+                    aria-checked={appearance.preserveNormalStationRouteCodesOnZoomOut === 'on'}
+                    aria-label="Toggle preserving wormy route codes on normal station dots when zoomed out"
+                    aria-disabled={appearance.normalStationDotWormyRouteCodes !== 'on'}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.normalStationDotWormyRouteCodes !== 'on'
+                        ? 'cursor-not-allowed border-border/60 bg-muted/40 opacity-50'
+                        : appearance.preserveNormalStationRouteCodesOnZoomOut === 'on'
+                          ? 'border-primary bg-primary'
+                          : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    disabled={appearance.normalStationDotWormyRouteCodes !== 'on'}
+                    onClick={() => {
+                      setPreserveNormalStationRouteCodesOnZoomOut(
+                        appearance.preserveNormalStationRouteCodesOnZoomOut === 'on' ? 'off' : 'on',
+                      );
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.preserveNormalStationRouteCodesOnZoomOut === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
               {appearance.normalStationDotWormyRouteCodes === 'on' ? (
                 <div className="rounded-md border border-blue-400/40 bg-blue-500/10 p-3 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
-                  <p className="text-blue-800/80 dark:text-blue-100/80">
-                    Shows wormy-style route codes on normal station dots only. Station group dot style is unchanged.
-                  </p>
                   <p className="mt-2 text-blue-800/80 dark:text-blue-100/80">
-                    Enable &quot;Split route code from route name&quot; under station labels for best results.
+                    Must enable &quot;Split route code from route name&quot; under station labels
                   </p>
                 </div>
               ) : null}
