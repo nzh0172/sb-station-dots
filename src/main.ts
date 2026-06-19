@@ -17,6 +17,7 @@ import {
   type NormalStationDotShape,
   type PreserveJoinedTransferNamesOnZoomOut,
   type PreserveNormalStationRouteCodesOnZoomOut,
+  type PreserveTransferDotRoutesOnZoomOut,
   type RouteSortByShape,
   type RouteSortDirection,
   type SplitRouteCodeFromName,
@@ -39,6 +40,7 @@ const STATION_NAME_WRAPPER_SELECTOR = '.maplibregl-marker .flex.flex-col.items-s
 const STATION_NAME_HOVER_SCALE = 1.1;
 const TRANSFER_CAPSULE_LABEL_GAP_PX = 4;
 const NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM = 13;
+const TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM = 13;
 const NORMAL_STATION_DOT_ZOOMED_OUT_SIZE_FACTOR = 0.72;
 const HOVER_ANIMATION_DURATION_MS = 0;
 const HOVER_ANIMATION_EASING = 'ease-out';
@@ -50,6 +52,12 @@ const TRANSFER_CAPSULE_DOT_CLASS = 'station-dots-transfer-capsule-dot';
 const TRANSFER_CAPSULE_ROW_CLASS = 'station-dots-transfer-capsule-row';
 const CAPSULE_ENTRIES_CACHE_KEY = 'stationDotsCapsuleCache';
 const CAPSULE_ENTRIES_CACHE_SPLIT_KEY = 'stationDotsCapsuleCacheSplit';
+const NORMAL_STATION_CAPSULE_CACHE_KEY = 'stationDotsNormalStationCapsuleCache';
+const NORMAL_STATION_CAPSULE_CACHE_SPLIT_KEY = 'stationDotsNormalStationCapsuleCacheSplit';
+const ROUTE_COLORS_CACHE_KEY = 'stationDotsRouteColorsCache';
+const ROUTE_LABELS_CACHE_KEY = 'stationDotsRouteLabelsCache';
+const STATION_ID_CACHE_KEY = 'stationDotsStationIdCache';
+const TRANSFER_GROUP_MARKER_KEY = 'stationDotsIsTransferGroup';
 const ROUTE_COLOR_CACHE_KEY = 'stationDotsRouteColor';
 
 type CleanupHandle = {
@@ -377,6 +385,13 @@ function arraysMatch(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
+function routeLabelsArePartialMatch(markerRouteLabels: string[], groupRouteLabels: string[]): boolean {
+  if (markerRouteLabels.length === 0 || groupRouteLabels.length === 0) return false;
+  if (markerRouteLabels.length >= groupRouteLabels.length) return false;
+
+  return markerRouteLabels.every((label) => groupRouteLabels.includes(label));
+}
+
 function getMarkerRouteBadgeLabels(marker: HTMLElement): string[] {
   return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
     .map((badge) => normalizeLabelText(badge.textContent ?? ''))
@@ -394,6 +409,98 @@ function getMarkerRouteBadgeLabelsInDisplayOrder(marker: HTMLElement): string[] 
   return Array.from(marker.querySelectorAll<HTMLElement>(LINE_BADGE_SELECTOR))
     .map((badge) => normalizeLabelText(badge.textContent ?? ''))
     .filter((label) => label.length > 0);
+}
+
+function getCachedMarkerRouteLabels(marker: HTMLElement): string[] {
+  const rawCache = marker.dataset[ROUTE_LABELS_CACHE_KEY];
+  if (!rawCache) return [];
+
+  try {
+    const parsed = JSON.parse(rawCache) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((value): value is string => typeof value === 'string' && value.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function cacheMarkerRouteLabels(marker: HTMLElement, routeLabels: string[]): void {
+  if (routeLabels.length === 0) return;
+
+  const cachedLabels = getCachedMarkerRouteLabels(marker);
+  if (routeLabels.length >= cachedLabels.length) {
+    marker.dataset[ROUTE_LABELS_CACHE_KEY] = JSON.stringify(routeLabels);
+    return;
+  }
+
+  if (Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM) {
+    marker.dataset[ROUTE_LABELS_CACHE_KEY] = JSON.stringify(routeLabels);
+  }
+}
+
+function getEffectiveMarkerRouteLabels(marker: HTMLElement): string[] {
+  const liveLabels = getMarkerRouteBadgeLabels(marker);
+  if (liveLabels.length > 0) {
+    cacheMarkerRouteLabels(marker, liveLabels);
+  }
+
+  const cachedLabels = getCachedMarkerRouteLabels(marker);
+  if (liveLabels.length >= cachedLabels.length) return liveLabels;
+
+  return cachedLabels.length > 0 ? cachedLabels : liveLabels;
+}
+
+function pinTransferGroupMarker(marker: HTMLElement): void {
+  marker.dataset[TRANSFER_GROUP_MARKER_KEY] = 'yes';
+}
+
+function isPinnedTransferGroupMarker(marker: HTMLElement): boolean {
+  return marker.dataset[TRANSFER_GROUP_MARKER_KEY] === 'yes';
+}
+
+function cacheMarkerStationId(marker: HTMLElement, stationId: string): void {
+  if (stationId.length === 0) return;
+
+  const existingId = getCachedMarkerStationId(marker);
+  if (
+    existingId.length > 0 &&
+    existingId !== stationId &&
+    Number.isFinite(currentMapZoom) &&
+    currentMapZoom < NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM
+  ) {
+    return;
+  }
+
+  marker.dataset[STATION_ID_CACHE_KEY] = stationId;
+}
+
+function getCachedMarkerStationId(marker: HTMLElement): string {
+  return marker.dataset[STATION_ID_CACHE_KEY] ?? '';
+}
+
+function resolveStationForMarker(
+  marker: HTMLElement,
+  markerStationName: string,
+  stationById: Map<string, Station>,
+): Station | undefined {
+  const cachedStationId = getCachedMarkerStationId(marker);
+  if (cachedStationId.length > 0) {
+    const cachedStation = stationById.get(cachedStationId);
+    if (cachedStation) return cachedStation;
+  }
+
+  if (markerStationName.length === 0 || !api?.gameState) return undefined;
+
+  const normalizedMarkerStationName = normalizeLabelText(markerStationName);
+  return api.gameState
+    .getStations()
+    .filter((entry) => normalizeLabelText(entry.name) === normalizedMarkerStationName)
+    .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left))[0];
+}
+
+function markerStationResolutionIsReliable(marker: HTMLElement, markerStationName: string): boolean {
+  return getCachedMarkerStationId(marker).length > 0 || markerStationName.length > 0;
 }
 
 function getRouteInitials(route: { bullet?: string; name?: string }): string {
@@ -417,21 +524,236 @@ function getMarkerStationBaseName(marker: HTMLElement): string {
   return normalizeLabelText(name?.dataset.stationDotsBaseName || name?.textContent || '');
 }
 
+function isCircularRoute(route: Route): boolean {
+  if (route.shape === 'circle') return true;
+
+  const stations = route.stations ?? [];
+  if (stations.length >= 2 && stations[0]?.id === stations[stations.length - 1]?.id) {
+    return true;
+  }
+
+  const seenStationIds = new Set<string>();
+  return stations.some((station) => {
+    if (seenStationIds.has(station.id)) return true;
+
+    seenStationIds.add(station.id);
+    return false;
+  });
+}
+
+function routeStopMatchesStation(routeStop: Station, targetStation: Station): boolean {
+  if (routeStop.id === targetStation.id) return true;
+
+  const targetName = normalizeLabelText(targetStation.name);
+  const routeStopName = normalizeLabelText(routeStop.name);
+  if (targetName.length > 0 && routeStopName === targetName) return true;
+
+  const targetStNodeIds = new Set(targetStation.stNodeIds);
+  return routeStop.stNodeIds.some((stNodeId) => targetStNodeIds.has(stNodeId));
+}
+
+function getRouteStationPositionsFromApiOrder(route: Route, targetStation: Station): number[] {
+  const stations = route.stations ?? [];
+  const positions: number[] = [];
+
+  for (let index = 0; index < stations.length; index += 1) {
+    const routeStop = stations[index];
+    if (!routeStop) continue;
+
+    if (routeStopMatchesStation(routeStop, targetStation)) {
+      positions.push(index + 1);
+    }
+  }
+
+  return positions;
+}
+
+function getRouteStationPositionsFromTimingOrder(route: Route, targetStation: Station): number[] {
+  const rawTimings = route.stComboTimings ?? [];
+  if (rawTimings.length === 0) return [];
+
+  const targetStNodeIds = new Set(targetStation.stNodeIds);
+  const positions: number[] = [];
+
+  for (let index = 0; index < rawTimings.length; index += 1) {
+    if (targetStNodeIds.has(rawTimings[index]?.stNodeId ?? '')) {
+      positions.push(index + 1);
+    }
+  }
+
+  return positions;
+}
+
+function getRouteStationPositions(route: Route, targetStation: Station, groupStationIds: string[]): number[] {
+  const fromRouteStations = getRouteStationPositionsFromApiOrder(route, targetStation);
+  if (fromRouteStations.length > 0) return fromRouteStations;
+
+  const fromTimings = getRouteStationPositionsFromTimingOrder(route, targetStation);
+  if (fromTimings.length > 0) return fromTimings;
+
+  const stations = route.stations ?? [];
+  const idPositions: number[] = [];
+  for (let index = 0; index < stations.length; index += 1) {
+    const routeStopId = stations[index]?.id ?? '';
+    if (groupStationIds.includes(routeStopId)) {
+      idPositions.push(index + 1);
+    }
+  }
+
+  return idPositions;
+}
+
+function buildCircularRouteStationNumberById(route: Route): Map<string, number> {
+  const stations = route.stations ?? [];
+  const numberByStationId = new Map<string, number>();
+  if (stations.length === 0) return numberByStationId;
+
+  const startId = stations[0]?.id ?? '';
+  const closesAtStart = stations.length >= 2 && stations[stations.length - 1]?.id === startId;
+  let position = 0;
+
+  for (let index = 0; index < stations.length; index += 1) {
+    if (closesAtStart && index === stations.length - 1) break;
+
+    const stopId = stations[index]?.id ?? '';
+    if (stopId.length === 0) continue;
+
+    if (position > 0 && stopId === startId) break;
+
+    if (numberByStationId.has(stopId)) continue;
+
+    position += 1;
+    numberByStationId.set(stopId, position);
+  }
+
+  return numberByStationId;
+}
+
+function findStationByStNodeId(stNodeId: string, stationById: Map<string, Station>): Station | undefined {
+  return Array.from(stationById.values()).find((station) => station.stNodeIds.includes(stNodeId));
+}
+
+function buildCircularRouteStationNumberFromTimings(
+  route: Route,
+  stationById: Map<string, Station>,
+): Map<string, number> {
+  const rawTimings = route.stComboTimings ?? [];
+  const numberByStationId = new Map<string, number>();
+  if (rawTimings.length === 0) return numberByStationId;
+
+  const startStNodeId = rawTimings[0]?.stNodeId ?? '';
+  const closesAtStart =
+    rawTimings.length >= 2 && rawTimings[rawTimings.length - 1]?.stNodeId === startStNodeId;
+  const seenStNodeIds = new Set<string>();
+  let position = 0;
+
+  for (let index = 0; index < rawTimings.length; index += 1) {
+    if (closesAtStart && index === rawTimings.length - 1) break;
+
+    const stNodeId = rawTimings[index]?.stNodeId ?? '';
+    if (stNodeId.length === 0) continue;
+
+    if (position > 0 && stNodeId === startStNodeId) break;
+
+    if (seenStNodeIds.has(stNodeId)) continue;
+    seenStNodeIds.add(stNodeId);
+
+    const station = findStationByStNodeId(stNodeId, stationById);
+    if (!station || numberByStationId.has(station.id)) continue;
+
+    position += 1;
+    numberByStationId.set(station.id, position);
+  }
+
+  return numberByStationId;
+}
+
+function lookupCircularRouteStationNumber(
+  route: Route,
+  targetStation: Station,
+  numberByStationId: Map<string, number>,
+): number | null {
+  const direct = numberByStationId.get(targetStation.id);
+  if (direct !== undefined) return direct;
+
+  for (const [stationId, number] of numberByStationId) {
+    const routeStop = route.stations?.find((stop) => stop.id === stationId);
+    if (routeStop && routeStopMatchesStation(routeStop, targetStation)) {
+      return number;
+    }
+  }
+
+  return null;
+}
+
+function getCircularRouteStationNumber(
+  route: Route,
+  targetStation: Station,
+  stationById: Map<string, Station>,
+): number | null {
+  const fromRouteStations = buildCircularRouteStationNumberById(route);
+  const fromStations = lookupCircularRouteStationNumber(route, targetStation, fromRouteStations);
+  if (fromStations !== null) return fromStations;
+
+  const fromTimings = buildCircularRouteStationNumberFromTimings(route, stationById);
+  return lookupCircularRouteStationNumber(route, targetStation, fromTimings);
+}
+
+function getRouteStationNumberFromPositions(route: Route, positions: number[]): number | null {
+  if (positions.length === 0) return null;
+
+  return positions[0] ?? null;
+}
+
 function getRouteStationNumber(route: Route, groupStationIds: string[], stationById: Map<string, Station>): string {
-  const stationIndex = route.stations?.findIndex((station) => groupStationIds.includes(station.id)) ?? -1;
-  if (stationIndex >= 0) return String(stationIndex + 1);
+  const groupStations = groupStationIds
+    .map((stationId) => stationById.get(stationId))
+    .filter((station): station is Station => station !== undefined);
+  const stationsOnRoute = groupStations.filter((station) => station.routeIds.includes(route.id));
+  const candidates = stationsOnRoute.length > 0 ? stationsOnRoute : groupStations;
 
-  const groupStNodeIds = new Set(
-    groupStationIds
-      .map((stationId) => stationById.get(stationId))
-      .filter((station): station is Station => station !== undefined)
-      .flatMap((station) => station.stNodeIds),
-  );
-  const timing = route.stComboTimings
-    ?.filter((entry) => groupStNodeIds.has(entry.stNodeId))
-    .sort((left, right) => left.stNodeIndex - right.stNodeIndex)[0];
+  for (const targetStation of candidates) {
+    if (isCircularRoute(route)) {
+      const circularNumber = getCircularRouteStationNumber(route, targetStation, stationById);
+      if (circularNumber !== null) return String(circularNumber);
+    }
 
-  return timing ? String(timing.stNodeIndex + 1) : '?';
+    const positions = getRouteStationPositions(route, targetStation, groupStationIds);
+    const stationNumber = getRouteStationNumberFromPositions(route, positions);
+    if (stationNumber !== null) return String(stationNumber);
+  }
+
+  return '?';
+}
+
+function refreshCapsuleEntryStationNumbers(
+  entries: CapsuleTransferEntry[],
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  markerStationName: string,
+  stationById: Map<string, Station>,
+): CapsuleTransferEntry[] {
+  if (!api?.gameState || entries.length === 0) return entries;
+
+  const routes = api.gameState.getRoutes();
+  const station = resolveStationForMarker(marker, markerStationName, stationById);
+  if (!station) return entries;
+
+  return entries.map((entry) => {
+    const route =
+      routes.find((candidate) => {
+        if (!station.routeIds.includes(candidate.id)) return false;
+
+        return routeMatchesMarkerRouteLabels(candidate, [entry.label], splitRouteCodeFromName);
+      }) ??
+      routes.find((candidate) => routeMatchesMarkerRouteLabels(candidate, [entry.label], splitRouteCodeFromName));
+    if (!route) return entry;
+
+    return {
+      ...entry,
+      stationNumber: getRouteStationNumber(route, [station.id], stationById),
+    };
+  });
 }
 
 function getCapsuleStationNumberSortValue(stationNumber: string): number {
@@ -480,12 +802,15 @@ function getCapsuleTransferEntries(
 ): CapsuleTransferEntry[] {
   if (!api?.gameState) return [];
 
-  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
+  const markerRouteLabels = getEffectiveMarkerRouteLabels(marker);
   const markerRouteLabelsInDisplayOrder = getMarkerRouteBadgeLabelsInDisplayOrder(marker);
-  const markerRouteLabelOrder = new Map(markerRouteLabelsInDisplayOrder.map((label, index) => [label, index]));
-  if (markerRouteLabels.length === 0) return [];
-
+  const cachedRouteLabels = getCachedMarkerRouteLabels(marker);
+  const markerRouteLabelOrder = new Map(
+    [...markerRouteLabelsInDisplayOrder, ...cachedRouteLabels].map((label, index) => [label, index]),
+  );
   const markerStationName = getMarkerStationBaseName(marker);
+  if (markerRouteLabels.length === 0 && markerStationName.length === 0) return [];
+
   const routes = api.gameState.getRoutes();
   const stations = api.gameState.getStations();
   const stationGroups = api.gameState.getStationGroups();
@@ -524,10 +849,23 @@ function getCapsuleTransferEntries(
         stationNameMatches,
       };
     })
-    .filter((entry) => arraysMatch(entry.groupRouteLabels, markerRouteLabels));
+    .filter((entry) => {
+      if (markerRouteLabels.length > 0) {
+        return (
+          arraysMatch(entry.groupRouteLabels, markerRouteLabels) ||
+          (entry.stationNameMatches && routeLabelsArePartialMatch(markerRouteLabels, entry.groupRouteLabels))
+        );
+      }
+
+      return entry.stationNameMatches && entry.groupRouteLabels.length >= 2;
+    });
 
   const matchingGroup = matchingGroups.find((entry) => entry.stationNameMatches) ?? matchingGroups[0];
   if (!matchingGroup) return [];
+
+  const usePartialRouteMatch =
+    markerRouteLabels.length === 0 ||
+    routeLabelsArePartialMatch(markerRouteLabels, matchingGroup.groupRouteLabels);
 
   const entries = matchingGroup.groupRouteIds
     .map((routeId) => routeById.get(routeId))
@@ -545,7 +883,7 @@ function getCapsuleTransferEntries(
         displayLabel,
       };
     })
-    .filter((entry) => markerRouteLabels.includes(entry.displayLabel));
+    .filter((entry) => usePartialRouteMatch || markerRouteLabels.includes(entry.displayLabel));
 
   return dedupeCapsuleEntriesByRouteLabel(entries)
     .sort((left, right) => left.displayOrder - right.displayOrder || compareRouteBadgeLabels(left.displayLabel, right.displayLabel))
@@ -640,6 +978,7 @@ function getCapsuleStationEntriesByName(
   markerStationName: string,
   splitRouteCodeFromName: SplitRouteCodeFromName,
   badgeColorByLabel: Map<string, string>,
+  marker?: HTMLElement,
 ): CapsuleTransferEntry[] {
   if (!api?.gameState) return [];
 
@@ -655,6 +994,10 @@ function getCapsuleStationEntriesByName(
     .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left))[0];
   if (!station) return [];
 
+  if (marker) {
+    cacheMarkerStationId(marker, station.id);
+  }
+
   return buildCapsuleEntriesForStation(
     station,
     splitRouteCodeFromName,
@@ -669,10 +1012,12 @@ function getCapsuleStationEntriesByName(
 function getCapsuleStationEntries(
   marker: HTMLElement,
   splitRouteCodeFromName: SplitRouteCodeFromName,
+  mode: 'transfer' | 'normal' = 'transfer',
 ): CapsuleTransferEntry[] {
   if (!api?.gameState) return [];
 
-  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
+  const liveRouteLabels = getMarkerRouteBadgeLabels(marker);
+  const markerRouteLabels = mode === 'normal' ? liveRouteLabels : getEffectiveMarkerRouteLabels(marker);
   const markerStationName = getMarkerStationBaseName(marker);
   const routes = api.gameState.getRoutes();
   const stations = api.gameState.getStations();
@@ -681,6 +1026,44 @@ function getCapsuleStationEntries(
   const markerRouteLabelsInDisplayOrder = getMarkerRouteBadgeLabelsInDisplayOrder(marker);
   const markerRouteLabelOrder = new Map(markerRouteLabelsInDisplayOrder.map((label, index) => [label, index]));
   const badgeColorByLabel = getRouteBadgeColorByLabel(marker);
+  const isZoomedOut =
+    Number.isFinite(currentMapZoom) && currentMapZoom < NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM;
+
+  const buildEntriesForResolvedStation = (station: Station, routeLabelFilter: string[] | null): CapsuleTransferEntry[] => {
+    cacheMarkerStationId(marker, station.id);
+
+    return buildCapsuleEntriesForStation(
+      station,
+      splitRouteCodeFromName,
+      stationById,
+      routeById,
+      badgeColorByLabel,
+      markerRouteLabelOrder,
+      routeLabelFilter,
+    );
+  };
+
+  if (mode === 'normal') {
+    const resolvedStation = resolveStationForMarker(marker, markerStationName, stationById);
+    if (resolvedStation) {
+      const stationRouteLabels = Array.from(
+        new Set(
+          resolvedStation.routeIds
+            .map((routeId) => routeById.get(routeId))
+            .map((route) => (route ? getRouteDisplayLabel(route, splitRouteCodeFromName) : ''))
+            .filter((label) => label.length > 0),
+        ),
+      ).sort((left, right) => compareRouteBadgeLabels(left, right));
+      const useAllRoutes =
+        isZoomedOut ||
+        liveRouteLabels.length === 0 ||
+        routeLabelsArePartialMatch(liveRouteLabels, stationRouteLabels);
+      const entries = buildEntriesForResolvedStation(resolvedStation, useAllRoutes ? null : liveRouteLabels);
+      if (entries.length > 0) return entries;
+    }
+
+    if (isZoomedOut) return [];
+  }
 
   if (markerRouteLabels.length > 0) {
     const matchingStations = stations
@@ -694,8 +1077,15 @@ function getCapsuleStationEntries(
           ),
         ).sort((left, right) => compareRouteBadgeLabels(left, right));
 
-        if (!arraysMatch(stationRouteLabels, markerRouteLabels)) return false;
-        if (markerStationName.length === 0) return true;
+        const routeLabelsMatch =
+          arraysMatch(stationRouteLabels, markerRouteLabels) ||
+          (mode === 'transfer' &&
+            routeLabelsArePartialMatch(markerRouteLabels, stationRouteLabels)) ||
+          (mode === 'normal' &&
+            markerStationName.length > 0 &&
+            routeLabelsArePartialMatch(markerRouteLabels, stationRouteLabels));
+        if (!routeLabelsMatch) return false;
+        if (markerStationName.length === 0) return mode === 'transfer';
 
         return normalizeLabelText(station.name) === markerStationName;
       })
@@ -703,26 +1093,27 @@ function getCapsuleStationEntries(
 
     const station = matchingStations[0];
     if (station) {
-      const filteredEntries = buildCapsuleEntriesForStation(
-        station,
-        splitRouteCodeFromName,
-        stationById,
-        routeById,
-        badgeColorByLabel,
-        markerRouteLabelOrder,
-        markerRouteLabels,
+      const stationRouteLabels = Array.from(
+        new Set(
+          station.routeIds
+            .map((routeId) => routeById.get(routeId))
+            .map((route) => (route ? getRouteDisplayLabel(route, splitRouteCodeFromName) : ''))
+            .filter((label) => label.length > 0),
+        ),
+      ).sort((left, right) => compareRouteBadgeLabels(left, right));
+      const usePartialRouteMatch = routeLabelsArePartialMatch(
+        mode === 'normal' ? liveRouteLabels : markerRouteLabels,
+        stationRouteLabels,
       );
+      const useAllRoutes =
+        mode === 'normal' &&
+        (isZoomedOut || liveRouteLabels.length === 0 || usePartialRouteMatch);
+      const routeLabelFilter = useAllRoutes ? null : markerRouteLabels;
+
+      const filteredEntries = buildEntriesForResolvedStation(station, routeLabelFilter);
       if (filteredEntries.length > 0) return filteredEntries;
 
-      const unfilteredEntries = buildCapsuleEntriesForStation(
-        station,
-        splitRouteCodeFromName,
-        stationById,
-        routeById,
-        badgeColorByLabel,
-        markerRouteLabelOrder,
-        null,
-      );
+      const unfilteredEntries = buildEntriesForResolvedStation(station, null);
       if (unfilteredEntries.length > 0) return unfilteredEntries;
     }
 
@@ -731,34 +1122,124 @@ function getCapsuleStationEntries(
         .filter((entry) => normalizeLabelText(entry.name) === markerStationName)
         .sort((left, right) => getStationRecentOrderScore(right) - getStationRecentOrderScore(left))[0];
       if (stationByName) {
-        const entriesByName = buildCapsuleEntriesForStation(
-          stationByName,
-          splitRouteCodeFromName,
-          stationById,
-          routeById,
-          badgeColorByLabel,
-          markerRouteLabelOrder,
-          markerRouteLabels,
-        );
+        const entriesByName = buildEntriesForResolvedStation(stationByName, null);
         if (entriesByName.length > 0) return entriesByName;
       }
     }
   }
 
-  return getCapsuleStationEntriesByName(markerStationName, splitRouteCodeFromName, badgeColorByLabel);
+  if (markerStationName.length > 0) {
+    return getCapsuleStationEntriesByName(markerStationName, splitRouteCodeFromName, badgeColorByLabel, marker);
+  }
+
+  return [];
+}
+
+function normalStationCapsuleEntriesHaveDuplicateLabels(entries: CapsuleTransferEntry[]): boolean {
+  if (entries.length <= 1) return false;
+
+  const uniqueLabels = new Set(entries.map((entry) => entry.label));
+  return uniqueLabels.size < entries.length;
+}
+
+function getCachedNormalStationCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): CapsuleTransferEntry[] {
+  if (marker.dataset[NORMAL_STATION_CAPSULE_CACHE_SPLIT_KEY] !== splitRouteCodeFromName) return [];
+
+  const rawCache = marker.dataset[NORMAL_STATION_CAPSULE_CACHE_KEY];
+  if (!rawCache) return [];
+
+  try {
+    const parsed = JSON.parse(rawCache) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isCapsuleTransferEntry);
+  } catch {
+    return [];
+  }
+}
+
+function cacheNormalStationCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  entries: CapsuleTransferEntry[],
+): void {
+  if (entries.length === 0) return;
+  if (!shouldUpdateNormalStationCapsuleCache(marker, splitRouteCodeFromName, entries)) return;
+
+  marker.dataset[NORMAL_STATION_CAPSULE_CACHE_KEY] = JSON.stringify(entries);
+  marker.dataset[NORMAL_STATION_CAPSULE_CACHE_SPLIT_KEY] = splitRouteCodeFromName;
+}
+
+function shouldUpdateNormalStationCapsuleCache(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  newEntries: CapsuleTransferEntry[],
+): boolean {
+  if (newEntries.length === 0) return false;
+  if (normalStationCapsuleEntriesHaveDuplicateLabels(newEntries)) return false;
+
+  const cachedEntries = getCachedNormalStationCapsuleEntries(marker, splitRouteCodeFromName);
+  if (cachedEntries.length === 0) return true;
+  if (newEntries.length >= cachedEntries.length) return true;
+
+  return Number.isFinite(currentMapZoom) && currentMapZoom >= NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM;
 }
 
 function getNormalStationWormyEntries(
   marker: HTMLElement,
   splitRouteCodeFromName: SplitRouteCodeFromName,
+  preserveNormalStationRouteCodesOnZoomOut: PreserveNormalStationRouteCodesOnZoomOut,
 ): CapsuleTransferEntry[] {
-  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
-  if (stationEntries.length > 0) {
-    cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, stationEntries);
-    return stationEntries;
+  const markerStationName = getMarkerStationBaseName(marker);
+  const stationById = new Map(
+    (api?.gameState?.getStations() ?? []).map((station) => [station.id, station]),
+  );
+  const cachedEntries = getCachedNormalStationCapsuleEntries(marker, splitRouteCodeFromName);
+  const liveEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName, 'normal');
+  const preserveOnZoomOut = preserveNormalStationRouteCodesOnZoomOut === 'on';
+  const isZoomedOut =
+    Number.isFinite(currentMapZoom) && currentMapZoom < NORMAL_STATION_DOT_WORMY_DETAIL_MIN_ZOOM;
+  const resolutionIsReliable = markerStationResolutionIsReliable(marker, markerStationName);
+
+  const refreshedLiveEntries = refreshCapsuleEntryStationNumbers(
+    liveEntries,
+    marker,
+    splitRouteCodeFromName,
+    markerStationName,
+    stationById,
+  );
+
+  if (refreshedLiveEntries.length > 0 && resolutionIsReliable) {
+    if (shouldUpdateNormalStationCapsuleCache(marker, splitRouteCodeFromName, refreshedLiveEntries)) {
+      cacheNormalStationCapsuleEntries(marker, splitRouteCodeFromName, refreshedLiveEntries);
+    }
   }
 
-  return getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
+  const refreshedCachedEntries = refreshCapsuleEntryStationNumbers(
+    cachedEntries,
+    marker,
+    splitRouteCodeFromName,
+    markerStationName,
+    stationById,
+  );
+
+  if (preserveOnZoomOut && isZoomedOut && refreshedCachedEntries.length > 0) {
+    if (
+      refreshedLiveEntries.length === 0 ||
+      !resolutionIsReliable ||
+      refreshedLiveEntries.length < refreshedCachedEntries.length ||
+      normalStationCapsuleEntriesHaveDuplicateLabels(refreshedLiveEntries)
+    ) {
+      return refreshedCachedEntries;
+    }
+  }
+
+  if (refreshedLiveEntries.length > 0) return refreshedLiveEntries;
+
+  return refreshedCachedEntries;
 }
 
 function isCapsuleTransferEntry(value: unknown): value is CapsuleTransferEntry {
@@ -771,17 +1252,6 @@ function isCapsuleTransferEntry(value: unknown): value is CapsuleTransferEntry {
     typeof entry.routeColor === 'string' &&
     typeof entry.textColor === 'string'
   );
-}
-
-function cacheMarkerCapsuleEntries(
-  marker: HTMLElement,
-  splitRouteCodeFromName: SplitRouteCodeFromName,
-  entries: CapsuleTransferEntry[],
-): void {
-  if (entries.length === 0) return;
-
-  marker.dataset[CAPSULE_ENTRIES_CACHE_KEY] = JSON.stringify(entries);
-  marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] = splitRouteCodeFromName;
 }
 
 function getCachedMarkerCapsuleEntries(
@@ -803,24 +1273,167 @@ function getCachedMarkerCapsuleEntries(
   }
 }
 
+function cacheMarkerCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  entries: CapsuleTransferEntry[],
+): void {
+  if (entries.length === 0) return;
+  if (!shouldUpdateCapsuleEntriesCache(marker, splitRouteCodeFromName, entries)) return;
+
+  marker.dataset[CAPSULE_ENTRIES_CACHE_KEY] = JSON.stringify(entries);
+  marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] = splitRouteCodeFromName;
+}
+
+function shouldUpdateCapsuleEntriesCache(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  newEntries: CapsuleTransferEntry[],
+): boolean {
+  if (newEntries.length === 0) return false;
+
+  const cachedEntries = getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
+  if (cachedEntries.length === 0) return true;
+  if (newEntries.length >= cachedEntries.length) return true;
+
+  return Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM;
+}
+
+function cacheMarkerRouteColors(marker: HTMLElement, routeColors: string[]): void {
+  const normalizedColors = Array.from(
+    new Set(
+      routeColors
+        .map((color) => normalizeColor(color))
+        .filter((color) => color.length > 0 && color !== 'transparent' && color !== 'rgba(0,0,0,0)'),
+    ),
+  );
+  if (normalizedColors.length === 0) return;
+  if (!shouldUpdateRouteColorsCache(marker, normalizedColors)) return;
+
+  marker.dataset[ROUTE_COLORS_CACHE_KEY] = JSON.stringify(normalizedColors);
+}
+
+function getCachedMarkerRouteColors(marker: HTMLElement): string[] {
+  const rawCache = marker.dataset[ROUTE_COLORS_CACHE_KEY];
+  if (!rawCache) return [];
+
+  try {
+    const parsed = JSON.parse(rawCache) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((value): value is string => typeof value === 'string' && value.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function shouldUpdateRouteColorsCache(marker: HTMLElement, newColors: string[]): boolean {
+  if (newColors.length === 0) return false;
+
+  const cachedColors = getCachedMarkerRouteColors(marker);
+  if (cachedColors.length === 0) return true;
+  if (newColors.length >= cachedColors.length) return true;
+
+  return Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM;
+}
+
+function shouldPreserveTransferDotRoutesOnZoomOut(
+  preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
+): boolean {
+  if (preserveTransferDotRoutesOnZoomOut === 'on') return true;
+
+  return Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM;
+}
+
+function resolveTransferDotRouteColors(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
+): string[] {
+  const liveColors = Array.from(new Set(getMarkerRouteBadgeColors(marker)));
+  const effectiveRouteLabels = getEffectiveMarkerRouteLabels(marker);
+
+  if (liveColors.length > 0) {
+    cacheMarkerRouteColors(marker, liveColors);
+  } else if (effectiveRouteLabels.length > 0 && api?.gameState) {
+    const routes = api.gameState.getRoutes();
+    const colorsFromLabels = effectiveRouteLabels
+      .map((label) => {
+        const route = routes.find((entry) => getRouteDisplayLabel(entry, splitRouteCodeFromName) === label);
+        return route?.color ?? '';
+      })
+      .filter((color) => color.length > 0);
+    if (colorsFromLabels.length > 0) {
+      cacheMarkerRouteColors(marker, colorsFromLabels);
+    }
+  }
+
+  const cachedColors = getCachedMarkerRouteColors(marker);
+  const preserveRoutes = shouldPreserveTransferDotRoutesOnZoomOut(preserveTransferDotRoutesOnZoomOut);
+  const effectiveLiveColors = liveColors.length > 0 ? liveColors : cachedColors.length > 0 ? cachedColors : ['#ffffff'];
+  const bestColors =
+    preserveRoutes && cachedColors.length > effectiveLiveColors.length ? cachedColors : effectiveLiveColors;
+
+  if (!preserveRoutes && bestColors.length > 1) {
+    return [bestColors[0]];
+  }
+
+  return bestColors.length > 0 ? bestColors : ['#ffffff'];
+}
+
 function getMarkerCapsuleEntries(
   marker: HTMLElement,
   splitRouteCodeFromName: SplitRouteCodeFromName,
+  preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
 ): CapsuleTransferEntry[] {
+  const cachedEntries = getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
   const transferEntries = getCapsuleTransferEntries(marker, splitRouteCodeFromName);
-  if (transferEntries.length > 0) {
-    cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, transferEntries);
-    return transferEntries;
-  }
-
   const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
-  if (stationEntries.length > 0) {
-    cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
-    cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, stationEntries);
-    return stationEntries;
+  const liveEntries = transferEntries.length > 0 ? transferEntries : stationEntries;
+
+  if (transferEntries.length > 0) {
+    pinTransferGroupMarker(marker);
   }
 
-  return getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
+  if (liveEntries.length > 0) {
+    if (shouldUpdateCapsuleEntriesCache(marker, splitRouteCodeFromName, liveEntries)) {
+      cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, liveEntries);
+    }
+    if (stationEntries.length > 0) {
+      cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
+    }
+  }
+
+  const preserveRoutes = shouldPreserveTransferDotRoutesOnZoomOut(preserveTransferDotRoutesOnZoomOut);
+  let entries = liveEntries;
+
+  if (entries.length === 0) {
+    entries = cachedEntries;
+  } else if (preserveRoutes && cachedEntries.length > entries.length) {
+    entries = cachedEntries;
+  }
+
+  if (!preserveRoutes && entries.length > 1) {
+    return entries.slice(0, 1);
+  }
+
+  return entries;
+}
+
+function getTransferGroupCapsuleEntries(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
+): CapsuleTransferEntry[] {
+  const entries = getMarkerCapsuleEntries(marker, splitRouteCodeFromName, preserveTransferDotRoutesOnZoomOut);
+  if (entries.length > 0) return entries;
+
+  if (isPinnedTransferGroupMarker(marker) || isMarkerTransferStation(marker, splitRouteCodeFromName)) {
+    pinTransferGroupMarker(marker);
+    return getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
+  }
+
+  return [];
 }
 
 function getTransferStationLabel(
@@ -1173,12 +1786,16 @@ function captureNativeTransferState(dot: HTMLElement): boolean {
 }
 
 function isMarkerTransferStation(marker: HTMLElement, splitRouteCodeFromName: SplitRouteCodeFromName): boolean {
-  const routeLabels = getMarkerRouteBadgeLabels(marker);
+  const routeLabels = getEffectiveMarkerRouteLabels(marker);
   const stationName = getMarkerStationBaseName(marker);
   const transferGroups = buildTransferStationGroups('off', splitRouteCodeFromName);
 
   if (routeLabels.length >= 2) {
-    const matchingGroups = transferGroups.filter((group) => arraysMatch(group.routeBullets, routeLabels));
+    const matchingGroups = transferGroups.filter(
+      (group) =>
+        arraysMatch(group.routeBullets, routeLabels) ||
+        routeLabelsArePartialMatch(routeLabels, group.routeBullets),
+    );
     if (matchingGroups.length === 0) return true;
     if (stationName.length === 0) return matchingGroups.some((group) => group.names.length > 1);
 
@@ -1209,10 +1826,17 @@ function getDotKind(
   const resolvedMarker =
     marker ?? (dot.closest('.maplibregl-marker') instanceof HTMLElement ? dot.closest('.maplibregl-marker') : null);
 
-  if (resolvedMarker instanceof HTMLElement && isMarkerTransferStation(resolvedMarker, splitRouteCodeFromName)) {
-    dot.dataset.stationDotsKind = 'transfer';
-    dot.dataset.stationDotsNativeTransfer = 'yes';
-    return 'transfer';
+  if (resolvedMarker instanceof HTMLElement) {
+    const isTransferGroup =
+      isPinnedTransferGroupMarker(resolvedMarker) ||
+      isMarkerTransferStation(resolvedMarker, splitRouteCodeFromName);
+
+    if (isTransferGroup) {
+      pinTransferGroupMarker(resolvedMarker);
+      dot.dataset.stationDotsKind = 'transfer';
+      dot.dataset.stationDotsNativeTransfer = 'yes';
+      return 'transfer';
+    }
   }
 
   if (dot.querySelector(`:scope > .${TRANSFER_CAPSULE_DOT_CLASS}`)) {
@@ -1229,6 +1853,26 @@ function getDotKind(
   dot.dataset.stationDotsKind = 'station';
   dot.dataset.stationDotsNativeTransfer = 'no';
   return 'station';
+}
+
+function resolveMarkerDotKind(
+  dot: HTMLElement | null,
+  marker: HTMLElement | null,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+): 'transfer' | 'station' | null {
+  if (!(dot instanceof HTMLElement)) return null;
+
+  const rawDotKind = getDotKind(dot, marker, splitRouteCodeFromName);
+  const isTransferGroupMarker =
+    marker instanceof HTMLElement &&
+    (isPinnedTransferGroupMarker(marker) || isMarkerTransferStation(marker, splitRouteCodeFromName));
+
+  if (isTransferGroupMarker && marker instanceof HTMLElement) {
+    pinTransferGroupMarker(marker);
+    return 'transfer';
+  }
+
+  return rawDotKind;
 }
 
 function removeTransferCapsuleDots(dot: HTMLElement): void {
@@ -1342,7 +1986,7 @@ function getNormalStationRouteColor(marker: HTMLElement, splitRouteCodeFromName:
   const cachedColor = getCachedMarkerRouteColor(marker);
   if (cachedColor) return cachedColor;
 
-  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
+  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName, 'normal');
   if (stationEntries.length > 0) {
     cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
     return stationEntries[0].routeColor;
@@ -1940,6 +2584,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     normalStationDotOutlineThickness,
     normalStationDotWormyRouteCodes,
     preserveNormalStationRouteCodesOnZoomOut,
+    preserveTransferDotRoutesOnZoomOut,
     transferDotSize,
     transferDotTrafficLight,
     transferDotStyle,
@@ -2099,7 +2744,7 @@ function applyMarkerAppearance(root: ParentNode): void {
     const dot = marker?.querySelector<HTMLElement>(STATION_DOT_SELECTOR);
     const dotKind =
       dot instanceof HTMLElement && marker instanceof HTMLElement
-        ? getDotKind(dot, marker, splitRouteCodeFromName)
+        ? resolveMarkerDotKind(dot, marker, splitRouteCodeFromName)
         : null;
     const currentName = normalizeLabelText(name.textContent ?? '');
     const lastAppliedName = name.dataset.stationDotsAppliedName;
@@ -2174,12 +2819,16 @@ function applyMarkerAppearance(root: ParentNode): void {
 
   dots.forEach((dot) => {
     const marker = dot.closest('.maplibregl-marker');
-    const dotKind = getDotKind(dot, marker instanceof HTMLElement ? marker : null, splitRouteCodeFromName);
+    const dotKind = resolveMarkerDotKind(
+      dot,
+      marker instanceof HTMLElement ? marker : null,
+      splitRouteCodeFromName,
+    );
     if (!dotKind) return;
 
     const routeColors =
       marker instanceof HTMLElement
-        ? Array.from(new Set(getMarkerRouteBadgeColors(marker)))
+        ? resolveTransferDotRouteColors(marker, splitRouteCodeFromName, preserveTransferDotRoutesOnZoomOut)
         : ['#ffffff'];
     const effectiveRouteColors = routeColors.length > 0 ? routeColors : ['#ffffff'];
     const dotSize = (dotKind === 'transfer' ? transferDotSize : normalStationDotSize) * globalScale;
@@ -2236,7 +2885,9 @@ function applyMarkerAppearance(root: ParentNode): void {
         );
       } else if (transferDotStyle === 'wormy') {
         const gummyEntries =
-          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
+          marker instanceof HTMLElement
+            ? getTransferGroupCapsuleEntries(marker, splitRouteCodeFromName, preserveTransferDotRoutesOnZoomOut)
+            : [];
         if (gummyEntries.length > 0) {
           applyTransferGummyWormDotStyle(
             dot,
@@ -2258,7 +2909,9 @@ function applyMarkerAppearance(root: ParentNode): void {
         }
       } else if (transferDotStyle === 'capsule') {
         const capsuleEntries =
-          marker instanceof HTMLElement ? getMarkerCapsuleEntries(marker, splitRouteCodeFromName) : [];
+          marker instanceof HTMLElement
+            ? getTransferGroupCapsuleEntries(marker, splitRouteCodeFromName, preserveTransferDotRoutesOnZoomOut)
+            : [];
         if (capsuleEntries.length > 0) {
           applyTransferCapsuleDotStyle(
             dot,
@@ -2293,7 +2946,13 @@ function applyMarkerAppearance(root: ParentNode): void {
           applyNormalStationZoomedOutDotStyle(dot, marker, dotSize, splitRouteCodeFromName);
         } else {
           const gummyEntries =
-            marker instanceof HTMLElement ? getNormalStationWormyEntries(marker, splitRouteCodeFromName) : [];
+            marker instanceof HTMLElement
+              ? getNormalStationWormyEntries(
+                  marker,
+                  splitRouteCodeFromName,
+                  preserveNormalStationRouteCodesOnZoomOut,
+                )
+              : [];
           if (gummyEntries.length > 0) {
             pinNormalStationDotKind(dot);
             if (marker instanceof HTMLElement) {
