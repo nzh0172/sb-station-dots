@@ -3,9 +3,8 @@ export type MarkerAppearanceKey =
   | 'normalStationDotSize'
   | 'normalStationDotShape'
   | 'normalStationDotOutlineThickness'
-  | 'normalStationDotWormyRouteCodes'
-  | 'preserveNormalStationRouteCodesOnZoomOut'
   | 'preserveTransferDotRoutesOnZoomOut'
+  | 'useWhiteTransferDotsOnZoomOut'
   | 'transferDotSize'
   | 'transferDotTrafficLight'
   | 'transferDotStyle'
@@ -29,9 +28,8 @@ export type MarkerAppearanceKey =
 type NumericMarkerAppearanceKey = Exclude<
   MarkerAppearanceKey,
   | 'normalStationDotShape'
-  | 'normalStationDotWormyRouteCodes'
-  | 'preserveNormalStationRouteCodesOnZoomOut'
   | 'preserveTransferDotRoutesOnZoomOut'
+  | 'useWhiteTransferDotsOnZoomOut'
   | 'transferDotTrafficLight'
   | 'transferDotStyle'
   | 'transferDotShape'
@@ -48,9 +46,8 @@ type NumericMarkerAppearanceKey = Exclude<
 >;
 
 export type NormalStationDotShape = 'circle' | 'square' | 'diamond';
-export type NormalStationDotWormyRouteCodes = 'off' | 'on';
-export type PreserveNormalStationRouteCodesOnZoomOut = 'off' | 'on';
 export type PreserveTransferDotRoutesOnZoomOut = 'off' | 'on';
+export type UseWhiteTransferDotsOnZoomOut = 'off' | 'on';
 export type JoinTransferNames = 'off' | 'on';
 export type TransferDotTrafficLight = 'off' | 'on';
 export type TransferDotStyle =
@@ -82,9 +79,8 @@ export type MarkerAppearanceState = {
   normalStationDotSize: number;
   normalStationDotShape: NormalStationDotShape;
   normalStationDotOutlineThickness: number;
-  normalStationDotWormyRouteCodes: NormalStationDotWormyRouteCodes;
-  preserveNormalStationRouteCodesOnZoomOut: PreserveNormalStationRouteCodesOnZoomOut;
   preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut;
+  useWhiteTransferDotsOnZoomOut: UseWhiteTransferDotsOnZoomOut;
   transferDotSize: number;
   transferDotTrafficLight: TransferDotTrafficLight;
   transferDotStyle: TransferDotStyle;
@@ -132,17 +128,13 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     step: 0.5,
     storageKey: 'com.author.modname:normal-station-dot-outline-thickness-px',
   },
-  normalStationDotWormyRouteCodes: {
-    defaultValue: 'off',
-    storageKey: 'com.author.modname:normal-station-dot-wormy-route-codes',
-  },
-  preserveNormalStationRouteCodesOnZoomOut: {
-    defaultValue: 'off',
-    storageKey: 'com.author.modname:preserve-normal-station-route-codes-on-zoom-out',
-  },
   preserveTransferDotRoutesOnZoomOut: {
     defaultValue: 'on',
     storageKey: 'com.author.modname:preserve-transfer-dot-routes-on-zoom-out',
+  },
+  useWhiteTransferDotsOnZoomOut: {
+    defaultValue: 'on',
+    storageKey: 'com.author.modname:use-white-transfer-dots-on-zoom-out',
   },
   transferDotSize: {
     defaultValue: 0.8,
@@ -247,9 +239,8 @@ const state: MarkerAppearanceState = {
   normalStationDotSize: loadValue('normalStationDotSize'),
   normalStationDotShape: loadValue('normalStationDotShape'),
   normalStationDotOutlineThickness: loadValue('normalStationDotOutlineThickness'),
-  normalStationDotWormyRouteCodes: loadValue('normalStationDotWormyRouteCodes'),
-  preserveNormalStationRouteCodesOnZoomOut: loadValue('preserveNormalStationRouteCodesOnZoomOut'),
   preserveTransferDotRoutesOnZoomOut: loadValue('preserveTransferDotRoutesOnZoomOut'),
+  useWhiteTransferDotsOnZoomOut: loadValue('useWhiteTransferDotsOnZoomOut'),
   transferDotSize: loadValue('transferDotSize'),
   transferDotTrafficLight: loadValue('transferDotTrafficLight'),
   transferDotShape: loadValue('transferDotShape'),
@@ -362,11 +353,7 @@ function normalizeSplitRouteCodeFromName(value: string): SplitRouteCodeFromName 
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
-function normalizeNormalStationDotWormyRouteCodes(value: string): NormalStationDotWormyRouteCodes {
-  return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
-}
-
-function normalizePreserveNormalStationRouteCodesOnZoomOut(value: string): PreserveNormalStationRouteCodesOnZoomOut {
+function normalizeUseWhiteTransferDotsOnZoomOut(value: string): UseWhiteTransferDotsOnZoomOut {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
@@ -412,14 +399,8 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
     return normalizeSplitRouteCodeFromName(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
-  if (key === 'normalStationDotWormyRouteCodes') {
-    return normalizeNormalStationDotWormyRouteCodes(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
-  }
-
-  if (key === 'preserveNormalStationRouteCodesOnZoomOut') {
-    return normalizePreserveNormalStationRouteCodesOnZoomOut(
-      stored ?? String(setting.defaultValue),
-    ) as MarkerAppearanceState[K];
+  if (key === 'useWhiteTransferDotsOnZoomOut') {
+    return normalizeUseWhiteTransferDotsOnZoomOut(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
   if (key === 'preserveTransferDotRoutesOnZoomOut') {
@@ -585,30 +566,13 @@ export function setSplitRouteCodeFromName(value: string): void {
   emit();
 }
 
-export function setNormalStationDotWormyRouteCodes(value: string): void {
-  const nextValue = normalizeNormalStationDotWormyRouteCodes(value);
+export function setUseWhiteTransferDotsOnZoomOut(value: string): void {
+  const nextValue = normalizeUseWhiteTransferDotsOnZoomOut(value);
 
-  const shouldResetPreserve = nextValue === 'off' && state.preserveNormalStationRouteCodesOnZoomOut !== 'off';
-  if (nextValue === state.normalStationDotWormyRouteCodes && !shouldResetPreserve) return;
+  if (nextValue === state.useWhiteTransferDotsOnZoomOut) return;
 
-  state.normalStationDotWormyRouteCodes = nextValue;
-  saveValue('normalStationDotWormyRouteCodes', nextValue);
-
-  if (nextValue === 'off') {
-    state.preserveNormalStationRouteCodesOnZoomOut = 'off';
-    saveValue('preserveNormalStationRouteCodesOnZoomOut', state.preserveNormalStationRouteCodesOnZoomOut);
-  }
-
-  emit();
-}
-
-export function setPreserveNormalStationRouteCodesOnZoomOut(value: string): void {
-  const nextValue = normalizePreserveNormalStationRouteCodesOnZoomOut(value);
-
-  if (nextValue === state.preserveNormalStationRouteCodesOnZoomOut) return;
-
-  state.preserveNormalStationRouteCodesOnZoomOut = nextValue;
-  saveValue('preserveNormalStationRouteCodesOnZoomOut', nextValue);
+  state.useWhiteTransferDotsOnZoomOut = nextValue;
+  saveValue('useWhiteTransferDotsOnZoomOut', nextValue);
   emit();
 }
 
@@ -647,12 +611,10 @@ export function resetMarkerAppearance(): void {
   state.normalStationDotSize = SETTINGS.normalStationDotSize.defaultValue as number;
   state.normalStationDotShape = SETTINGS.normalStationDotShape.defaultValue as NormalStationDotShape;
   state.normalStationDotOutlineThickness = SETTINGS.normalStationDotOutlineThickness.defaultValue as number;
-  state.normalStationDotWormyRouteCodes =
-    SETTINGS.normalStationDotWormyRouteCodes.defaultValue as NormalStationDotWormyRouteCodes;
-  state.preserveNormalStationRouteCodesOnZoomOut =
-    SETTINGS.preserveNormalStationRouteCodesOnZoomOut.defaultValue as PreserveNormalStationRouteCodesOnZoomOut;
   state.preserveTransferDotRoutesOnZoomOut =
     SETTINGS.preserveTransferDotRoutesOnZoomOut.defaultValue as PreserveTransferDotRoutesOnZoomOut;
+  state.useWhiteTransferDotsOnZoomOut =
+    SETTINGS.useWhiteTransferDotsOnZoomOut.defaultValue as UseWhiteTransferDotsOnZoomOut;
   state.transferDotSize = SETTINGS.transferDotSize.defaultValue as number;
   state.transferDotTrafficLight = SETTINGS.transferDotTrafficLight.defaultValue as TransferDotTrafficLight;
   state.transferDotStyle = SETTINGS.transferDotStyle.defaultValue as TransferDotStyle;
@@ -678,9 +640,8 @@ export function resetMarkerAppearance(): void {
   saveValue('normalStationDotSize', state.normalStationDotSize);
   saveValue('normalStationDotShape', state.normalStationDotShape);
   saveValue('normalStationDotOutlineThickness', state.normalStationDotOutlineThickness);
-  saveValue('normalStationDotWormyRouteCodes', state.normalStationDotWormyRouteCodes);
-  saveValue('preserveNormalStationRouteCodesOnZoomOut', state.preserveNormalStationRouteCodesOnZoomOut);
   saveValue('preserveTransferDotRoutesOnZoomOut', state.preserveTransferDotRoutesOnZoomOut);
+  saveValue('useWhiteTransferDotsOnZoomOut', state.useWhiteTransferDotsOnZoomOut);
   saveValue('transferDotSize', state.transferDotSize);
   saveValue('transferDotTrafficLight', state.transferDotTrafficLight);
   saveValue('transferDotStyle', state.transferDotStyle);
