@@ -12,6 +12,8 @@ import {
   setRouteSortByShape,
   setRouteSortDirection,
   setSplitRouteCodeFromName,
+  setShowRouteCodeStationNumber,
+  setRouteNameCodeDelimiter,
   setMarkerAppearanceColor,
   setMarkerAppearanceShape,
   setMarkerAppearanceValue,
@@ -21,7 +23,10 @@ import {
 
 const api = window.SubwayBuilderAPI;
 const { Button } = api.utils.components as Record<string, React.ComponentType<any>>;
-const { Eye, EyeOff } = api.utils.icons as Record<string, React.ComponentType<{ className?: string }>>;
+const { Eye, EyeOff, ChevronDown, ChevronRight } = api.utils.icons as Record<
+  string,
+  React.ComponentType<{ className?: string }>
+>;
 const globalScaleRange = getMarkerAppearanceRange('globalScale');
 const normalStationDotRange = getMarkerAppearanceRange('normalStationDotSize');
 const normalStationDotOutlineThicknessRange = getMarkerAppearanceRange('normalStationDotOutlineThickness');
@@ -31,6 +36,7 @@ const lineBadgeRange = getMarkerAppearanceRange('lineBadgeSize');
 const editRouteOrderButtonScaleRange = getMarkerAppearanceRange('editRouteOrderButtonScale');
 const stationNameRange = getMarkerAppearanceRange('stationNameSize');
 const routeIconWrapWidthRange = getMarkerAppearanceRange('routeIconWrapWidth');
+const routeCodeStationNumberZeroPadRange = getMarkerAppearanceRange('routeCodeStationNumberZeroPad');
 const PANEL_COMPONENT_KEY = '__markerAppearanceToolbarComponent';
 const EMOJI_PRESETS = emojiPresets as Array<{ icon: string; label: string }>;
 const NORMAL_STATION_DOT_SHAPES = [
@@ -54,7 +60,7 @@ const ROUTE_SORT_DIRECTIONS = [
   { label: 'Descending', value: 'descending' },
 ] as const;
 const PANEL_CARD_CLASS = 'rounded-xl border-2 border-border bg-background/40 p-4';
-const PANEL_CARD_STRETCH_CLASS = `h-full ${PANEL_CARD_CLASS}`;
+const PANEL_CARD_STRETCH_CLASS = PANEL_CARD_CLASS;
 const PANEL_CARD_HEADER_CLASS = 'mb-4 flex items-center justify-between gap-3';
 const PANEL_FIELD_CLASS = 'flex flex-col gap-2';
 const PANEL_FIELD_ROW_CLASS = 'flex items-center justify-between gap-3';
@@ -103,6 +109,59 @@ async function copyEmojiToClipboard(value: string, label: string): Promise<void>
   }
 }
 
+function getDelimiterInputValue(delimiter: string): string {
+  return delimiter === ' ' ? '' : delimiter;
+}
+
+function formatDelimiterPreview(delimiter: string): string {
+  if (delimiter === ' ') return 'space';
+  return delimiter;
+}
+
+function RouteCodeHelpCollapsible() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded-md border border-blue-400/40 bg-blue-500/10 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
+      <button
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-2 p-3 text-left transition-colors hover:bg-blue-500/10"
+        type="button"
+        onClick={() => {
+          setIsOpen((open) => !open);
+        }}
+      >
+        <span className="font-small text-blue-900 dark:text-blue-50">How to make a route code</span>
+        {isOpen ? (
+          ChevronDown ? <ChevronDown className="h-4 w-4 shrink-0" /> : <span>−</span>
+        ) : ChevronRight ? (
+          <ChevronRight className="h-4 w-4 shrink-0" />
+        ) : (
+          <span>+</span>
+        )}
+      </button>
+
+      {isOpen ? (
+        <div className="border-t border-blue-400/30 px-3 pb-3 pt-2">
+          <p>
+            Name your route as [Route code][delimiter][Route name], e.g. PY Putrajaya Line, KA_Kream Avenue Line,
+            or KA-Kream Avenue Line.
+          </p>
+          <p className="mt-1 text-blue-800/80 dark:text-blue-100/80">
+            ie: PY Putrajaya Line (PY=code, Putrajaya Line=route name)
+          </p>
+          <p className="mt-3 font-small text-blue-900 dark:text-blue-50">Recommendation</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-blue-800/80 dark:text-blue-100/80">
+            <li>Use a short route code (three letters or fewer)</li>
+            <li>Enable split route code from route name below</li>
+            <li>Disable route icon visibility in station labels</li>
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TransferDotPanel() {
   const [appearance, setAppearance] = useState(getMarkerAppearance());
 
@@ -111,9 +170,10 @@ export function TransferDotPanel() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-4 p-3">
-      <div className="grid grid-cols-3 gap-3 items-stretch">
-        <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+        <div className="grid grid-cols-4 items-start gap-3">
+        <div className="flex flex-col gap-3">
           <div className={PANEL_CARD_STRETCH_CLASS}>
             <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Global scale</p>
@@ -262,7 +322,7 @@ export function TransferDotPanel() {
           </div>
         </div>
 
-        <div className="flex h-full flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <div className={PANEL_CARD_STRETCH_CLASS}>
             <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Station group dots</p>
@@ -347,23 +407,7 @@ export function TransferDotPanel() {
                 </label>
               </div>
 
-              {appearance.transferDotStyle === 'capsule' || appearance.transferDotStyle === 'wormy' ? (
-                <div className="rounded-md border border-blue-400/40 bg-blue-500/10 p-3 text-sm leading-relaxed text-blue-950 dark:text-blue-100">
-                  <p className="font-small text-blue-900 dark:text-blue-50">How to make a route code</p>
-                  <p className="mt-1">
-                    Name your route as [Route code] [Route name], only the first space will split the names.
-                  </p>
-                  <p className="mt-1 text-blue-800/80 dark:text-blue-100/80">
-                    ie: PY Putrajaya Line (PY=code, Putrajaya Line=route name)
-                  </p>
-                  <p className="mt-3 font-small text-blue-900 dark:text-blue-50">Recommendation</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-blue-800/80 dark:text-blue-100/80">
-                    <li>Route is named shorter than three letters as route code</li>
-                    <li>Enable &quot;split route code from route name&quot; in station labels</li>
-                    <li>Disable route icon visibility</li>
-                  </ul>
-                </div>
-              ) : (
+              {appearance.transferDotStyle === 'capsule' || appearance.transferDotStyle === 'wormy' ? null : (
                 <>
                   <div className={PANEL_FIELD_CLASS}>
                     <div className={PANEL_FIELD_ROW_CLASS}>
@@ -481,7 +525,7 @@ export function TransferDotPanel() {
 
         </div>
 
-        <div className="flex h-full flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <div className={PANEL_CARD_STRETCH_CLASS}>
             <div className={PANEL_CARD_HEADER_CLASS}>
               <p className="text-sm font-medium">Station labels</p>
@@ -569,32 +613,6 @@ export function TransferDotPanel() {
                     setMarkerAppearanceValue('stationNameSize', Number.parseFloat(event.target.value));
                   }}
                 />
-              </div>
-
-              <div>
-                <label className={PANEL_SWITCH_ROW_CLASS}>
-                  <span className="pr-3 text-sm font-medium">Split route code from route name (for capsule & wormy)</span>
-                  <button
-                    aria-checked={appearance.splitRouteCodeFromName === 'on'}
-                    aria-label="Toggle route code and name split"
-                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
-                      appearance.splitRouteCodeFromName === 'on'
-                        ? 'border-primary bg-primary'
-                        : 'border-border bg-muted/60'
-                    }`}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      setSplitRouteCodeFromName(appearance.splitRouteCodeFromName === 'on' ? 'off' : 'on');
-                    }}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                        appearance.splitRouteCodeFromName === 'on' ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </label>
               </div>
 
               <div>
@@ -745,9 +763,124 @@ export function TransferDotPanel() {
             </div>
           </div>
         </div>
+
+        <div className="flex flex-col gap-3">
+          <div className={PANEL_CARD_STRETCH_CLASS}>
+            <div className={PANEL_CARD_HEADER_CLASS}>
+              <p className="text-sm font-medium">Route code</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <RouteCodeHelpCollapsible />
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Split route code from route name</span>
+                  <button
+                    aria-checked={appearance.splitRouteCodeFromName === 'on'}
+                    aria-label="Toggle route code and name split"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.splitRouteCodeFromName === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setSplitRouteCodeFromName(appearance.splitRouteCodeFromName === 'on' ? 'off' : 'on');
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.splitRouteCodeFromName === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+              <div className={PANEL_FIELD_CLASS}>
+                <label className="text-sm font-medium" htmlFor="route-name-code-delimiter">
+                  Route name code delimiter
+                </label>
+                <input
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  id="route-name-code-delimiter"
+                  placeholder="Space (default)"
+                  type="text"
+                  value={getDelimiterInputValue(appearance.routeNameCodeDelimiter)}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.length === 0 ? ' ' : event.target.value;
+                    setRouteNameCodeDelimiter(nextValue);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Splits route code from route name when parsing names. Current delimiter:{' '}
+                  {formatDelimiterPreview(appearance.routeNameCodeDelimiter)}.
+                </p>
+              </div>
+
+              <div>
+                <label className={PANEL_SWITCH_ROW_CLASS}>
+                  <span className="pr-3 text-sm font-medium">Show station number on route code</span>
+                  <button
+                    aria-checked={appearance.showRouteCodeStationNumber === 'on'}
+                    aria-label="Toggle station number on route code"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                      appearance.showRouteCodeStationNumber === 'on'
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-muted/60'
+                    }`}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      setShowRouteCodeStationNumber(
+                        appearance.showRouteCodeStationNumber === 'on' ? 'off' : 'on',
+                      );
+                    }}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                        appearance.showRouteCodeStationNumber === 'on' ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              </div>
+
+              <div className={PANEL_FIELD_CLASS}>
+                <div className={PANEL_FIELD_ROW_CLASS}>
+                  <p className="text-sm font-medium">Station number zero pad</p>
+                  <div className="min-w-14 text-right font-mono text-sm">
+                    {appearance.routeCodeStationNumberZeroPad}
+                  </div>
+                </div>
+                <input
+                  aria-label="Route code station number zero pad count"
+                  className="w-full accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={appearance.showRouteCodeStationNumber !== 'on'}
+                  max={routeCodeStationNumberZeroPadRange.max}
+                  min={routeCodeStationNumberZeroPadRange.min}
+                  step={routeCodeStationNumberZeroPadRange.step}
+                  type="range"
+                  value={appearance.routeCodeStationNumberZeroPad}
+                  onChange={(event) => {
+                    setMarkerAppearanceValue('routeCodeStationNumberZeroPad', Number.parseInt(event.target.value, 10));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leading zeros on the station number (1 → 01, 12 → 012 at pad 1). Displayed as KA01, KA054 with no
+                  separator.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="shrink-0 border-t border-border bg-background/80 p-3 backdrop-blur-sm">
+        <div className="flex gap-2">
         <Button
           variant="secondary"
           onClick={() => resetMarkerAppearance()}
@@ -755,6 +888,7 @@ export function TransferDotPanel() {
           Reset
         </Button>
 
+        </div>
       </div>
     </div>
   );
@@ -766,5 +900,9 @@ export function setToolbarPanelComponent(component: React.ComponentType): void {
 
 export function MarkerAppearanceToolbarHost() {
   const component = (window as Window & { [PANEL_COMPONENT_KEY]?: React.ComponentType })[PANEL_COMPONENT_KEY];
-  return component ? createElement(component) : null;
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {component ? createElement(component) : null}
+    </div>
+  );
 }

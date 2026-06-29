@@ -19,6 +19,9 @@ export type MarkerAppearanceKey =
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
   | 'splitRouteCodeFromName'
+  | 'showRouteCodeStationNumber'
+  | 'routeCodeStationNumberZeroPad'
+  | 'routeNameCodeDelimiter'
   | 'routeSortDirection'
   | 'routeSortByShape'
   | 'routeIconWrapWidth'
@@ -37,6 +40,8 @@ type NumericMarkerAppearanceKey = Exclude<
   | 'joinTransferNamesOrder'
   | 'preserveJoinedTransferNamesOnZoomOut'
   | 'splitRouteCodeFromName'
+  | 'showRouteCodeStationNumber'
+  | 'routeNameCodeDelimiter'
   | 'stationNameLabelsVisible'
   | 'routeIconLabelsVisible'
   | 'routeSortDirection'
@@ -62,6 +67,7 @@ export type TransferDotStyle =
 export type JoinTransferNamesOrder = 'off' | 'on';
 export type PreserveJoinedTransferNamesOnZoomOut = 'off' | 'on';
 export type SplitRouteCodeFromName = 'off' | 'on';
+export type ShowRouteCodeStationNumber = 'off' | 'on';
 export type LabelVisibility = 'off' | 'on';
 export type RouteSortDirection = 'original' | 'ascending' | 'descending';
 export type RouteSortByShape = 'off' | 'on';
@@ -95,6 +101,9 @@ export type MarkerAppearanceState = {
   joinTransferNamesOrder: JoinTransferNamesOrder;
   preserveJoinedTransferNamesOnZoomOut: PreserveJoinedTransferNamesOnZoomOut;
   splitRouteCodeFromName: SplitRouteCodeFromName;
+  showRouteCodeStationNumber: ShowRouteCodeStationNumber;
+  routeCodeStationNumberZeroPad: number;
+  routeNameCodeDelimiter: string;
   routeSortDirection: RouteSortDirection;
   routeSortByShape: RouteSortByShape;
   routeIconWrapWidth: number;
@@ -207,6 +216,21 @@ const SETTINGS: Record<MarkerAppearanceKey, MarkerAppearanceSetting> = {
     defaultValue: 'off',
     storageKey: 'com.author.modname:split-route-code-from-name',
   },
+  showRouteCodeStationNumber: {
+    defaultValue: 'on',
+    storageKey: 'com.author.modname:show-route-code-station-number',
+  },
+  routeCodeStationNumberZeroPad: {
+    defaultValue: 1,
+    min: 1,
+    max: 3,
+    step: 1,
+    storageKey: 'com.author.modname:route-code-station-number-zero-pad',
+  },
+  routeNameCodeDelimiter: {
+    defaultValue: ' ',
+    storageKey: 'com.author.modname:route-name-code-delimiter',
+  },
   routeSortDirection: {
     defaultValue: 'original',
     storageKey: 'com.author.modname:route-sort-direction',
@@ -255,6 +279,9 @@ const state: MarkerAppearanceState = {
   joinTransferNamesOrder: loadValue('joinTransferNamesOrder'),
   preserveJoinedTransferNamesOnZoomOut: loadValue('preserveJoinedTransferNamesOnZoomOut'),
   splitRouteCodeFromName: loadValue('splitRouteCodeFromName'),
+  showRouteCodeStationNumber: loadValue('showRouteCodeStationNumber'),
+  routeCodeStationNumberZeroPad: loadValue('routeCodeStationNumberZeroPad'),
+  routeNameCodeDelimiter: loadValue('routeNameCodeDelimiter'),
   routeSortDirection: loadValue('routeSortDirection'),
   routeSortByShape: loadValue('routeSortByShape'),
   routeIconWrapWidth: loadValue('routeIconWrapWidth'),
@@ -353,6 +380,20 @@ function normalizeSplitRouteCodeFromName(value: string): SplitRouteCodeFromName 
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
 
+function normalizeShowRouteCodeStationNumber(value: string): ShowRouteCodeStationNumber {
+  return value.trim().toLowerCase() === 'off' ? 'off' : 'on';
+}
+
+function normalizeRouteNameCodeDelimiter(value: string | null | undefined): string {
+  if (value === null || value === undefined) return ' ';
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return ' ';
+  if (trimmed === '\\s' || trimmed === '<space>') return ' ';
+
+  return value;
+}
+
 function normalizeUseWhiteTransferDotsOnZoomOut(value: string): UseWhiteTransferDotsOnZoomOut {
   return value.trim().toLowerCase() === 'on' ? 'on' : 'off';
 }
@@ -399,6 +440,17 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
     return normalizeSplitRouteCodeFromName(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
 
+  if (key === 'showRouteCodeStationNumber') {
+    return normalizeShowRouteCodeStationNumber(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
+  }
+
+  if (key === 'routeNameCodeDelimiter') {
+    const legacyStored = window.localStorage.getItem('com.author.modname:route-code-station-number-delimiter');
+    return normalizeRouteNameCodeDelimiter(
+      stored ?? legacyStored ?? String(setting.defaultValue),
+    ) as MarkerAppearanceState[K];
+  }
+
   if (key === 'useWhiteTransferDotsOnZoomOut') {
     return normalizeUseWhiteTransferDotsOnZoomOut(stored ?? String(setting.defaultValue)) as MarkerAppearanceState[K];
   }
@@ -422,7 +474,11 @@ function loadValue<K extends MarkerAppearanceKey>(key: K): MarkerAppearanceState
   }
 
   if (typeof setting.defaultValue === 'string') {
-    return normalizeHexColor(stored ?? setting.defaultValue) as MarkerAppearanceState[K];
+    if (key === 'transferDotColor' || key === 'transferDotOutlineColor') {
+      return normalizeHexColor(stored ?? setting.defaultValue) as MarkerAppearanceState[K];
+    }
+
+    return (stored ?? setting.defaultValue) as MarkerAppearanceState[K];
   }
 
   const parsed = stored ? Number.parseFloat(stored) : Number.NaN;
@@ -566,6 +622,26 @@ export function setSplitRouteCodeFromName(value: string): void {
   emit();
 }
 
+export function setShowRouteCodeStationNumber(value: string): void {
+  const nextValue = normalizeShowRouteCodeStationNumber(value);
+
+  if (nextValue === state.showRouteCodeStationNumber) return;
+
+  state.showRouteCodeStationNumber = nextValue;
+  saveValue('showRouteCodeStationNumber', nextValue);
+  emit();
+}
+
+export function setRouteNameCodeDelimiter(value: string): void {
+  const nextValue = normalizeRouteNameCodeDelimiter(value);
+
+  if (nextValue === state.routeNameCodeDelimiter) return;
+
+  state.routeNameCodeDelimiter = nextValue;
+  saveValue('routeNameCodeDelimiter', nextValue);
+  emit();
+}
+
 export function setUseWhiteTransferDotsOnZoomOut(value: string): void {
   const nextValue = normalizeUseWhiteTransferDotsOnZoomOut(value);
 
@@ -630,6 +706,10 @@ export function resetMarkerAppearance(): void {
   state.preserveJoinedTransferNamesOnZoomOut =
     SETTINGS.preserveJoinedTransferNamesOnZoomOut.defaultValue as PreserveJoinedTransferNamesOnZoomOut;
   state.splitRouteCodeFromName = SETTINGS.splitRouteCodeFromName.defaultValue as SplitRouteCodeFromName;
+  state.showRouteCodeStationNumber =
+    SETTINGS.showRouteCodeStationNumber.defaultValue as ShowRouteCodeStationNumber;
+  state.routeCodeStationNumberZeroPad = SETTINGS.routeCodeStationNumberZeroPad.defaultValue as number;
+  state.routeNameCodeDelimiter = SETTINGS.routeNameCodeDelimiter.defaultValue as string;
   state.routeSortDirection = SETTINGS.routeSortDirection.defaultValue as RouteSortDirection;
   state.routeSortByShape = SETTINGS.routeSortByShape.defaultValue as RouteSortByShape;
   state.routeIconWrapWidth = SETTINGS.routeIconWrapWidth.defaultValue as number;
@@ -656,6 +736,9 @@ export function resetMarkerAppearance(): void {
   saveValue('joinTransferNamesOrder', state.joinTransferNamesOrder);
   saveValue('preserveJoinedTransferNamesOnZoomOut', state.preserveJoinedTransferNamesOnZoomOut);
   saveValue('splitRouteCodeFromName', state.splitRouteCodeFromName);
+  saveValue('showRouteCodeStationNumber', state.showRouteCodeStationNumber);
+  saveValue('routeCodeStationNumberZeroPad', state.routeCodeStationNumberZeroPad);
+  saveValue('routeNameCodeDelimiter', state.routeNameCodeDelimiter);
   saveValue('routeSortDirection', state.routeSortDirection);
   saveValue('routeSortByShape', state.routeSortByShape);
   saveValue('routeIconWrapWidth', state.routeIconWrapWidth);

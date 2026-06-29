@@ -18,6 +18,7 @@ import {
   type PreserveJoinedTransferNamesOnZoomOut,
   type PreserveTransferDotRoutesOnZoomOut,
   type UseWhiteTransferDotsOnZoomOut,
+  type ShowRouteCodeStationNumber,
   type RouteSortByShape,
   type RouteSortDirection,
   type SplitRouteCodeFromName,
@@ -110,6 +111,18 @@ type CapsuleTransferEntry = {
 type CapsuleTransferEntryWithSort = CapsuleTransferEntry & {
   displayOrder: number;
   displayLabel: string;
+};
+
+type RouteCodeDisplayOptions = {
+  showStationNumber: ShowRouteCodeStationNumber;
+  zeroPad: number;
+};
+
+type RouteCodeEntryDisplay = {
+  showStationNumber: boolean;
+  label: string;
+  stationNumber: string;
+  inlineText: string;
 };
 
 type CapsuleStationGroupMatch = {
@@ -222,19 +235,36 @@ function getStationRecentOrderScore(station: { id: string; createdAt: number }):
   return station.createdAt;
 }
 
-function parseRouteNameParts(routeName: string | undefined): ParsedRouteName {
-  const normalizedName = normalizeLabelText(routeName ?? '');
-  const firstSpaceIndex = normalizedName.search(/\s/);
-
-  if (firstSpaceIndex <= 0) {
-    return { code: normalizedName, name: normalizedName };
+function parseRouteNameParts(routeName: string | undefined, routeNameCodeDelimiter?: string): ParsedRouteName {
+  const delimiter = routeNameCodeDelimiter ?? getMarkerAppearance().routeNameCodeDelimiter;
+  const source = (routeName ?? '').trim();
+  if (source.length === 0) {
+    return { code: '', name: '' };
   }
 
-  const code = normalizeLabelText(normalizedName.slice(0, firstSpaceIndex));
-  const name = normalizeLabelText(normalizedName.slice(firstSpaceIndex + 1));
+  const usesWhitespaceDelimiter = delimiter === ' ' || delimiter.length === 0;
+  if (usesWhitespaceDelimiter) {
+    const firstSpaceIndex = source.search(/\s/);
+    if (firstSpaceIndex <= 0) {
+      const normalized = normalizeLabelText(source);
+      return { code: normalized, name: normalized };
+    }
+
+    return {
+      code: normalizeLabelText(source.slice(0, firstSpaceIndex)),
+      name: normalizeLabelText(source.slice(firstSpaceIndex + 1)),
+    };
+  }
+
+  const splitIndex = source.indexOf(delimiter);
+  if (splitIndex <= 0) {
+    const normalized = normalizeLabelText(source);
+    return { code: normalized, name: normalized };
+  }
+
   return {
-    code: code || normalizedName,
-    name: name || normalizedName,
+    code: normalizeLabelText(source.slice(0, splitIndex)),
+    name: normalizeLabelText(source.slice(splitIndex + delimiter.length)),
   };
 }
 
@@ -242,22 +272,35 @@ function getRouteBaseDisplayLabel(route: { bullet?: string; name?: string }): st
   return normalizeLabelText(route.bullet?.trim() || route.name?.trim() || '');
 }
 
-function getRouteSplitSource(route: { bullet?: string; name?: string }): string {
-  const name = normalizeLabelText(route.name ?? '');
-  if (/\s/.test(name)) return name;
+function getRouteSplitSource(
+  route: { bullet?: string; name?: string },
+  routeNameCodeDelimiter?: string,
+): string {
+  const delimiter = routeNameCodeDelimiter ?? getMarkerAppearance().routeNameCodeDelimiter;
+  const name = (route.name ?? '').trim();
+  if (delimiter !== ' ' && delimiter.length > 0 && name.includes(delimiter)) {
+    return normalizeLabelText(name);
+  }
+
+  const normalizedName = normalizeLabelText(name);
+  if (/\s/.test(normalizedName)) return normalizedName;
 
   const baseDisplayLabel = getRouteBaseDisplayLabel(route);
   if (/\s/.test(baseDisplayLabel)) return baseDisplayLabel;
 
-  return name || baseDisplayLabel;
+  return normalizedName || baseDisplayLabel;
 }
 
 function getRouteDisplayLabel(
   route: { bullet?: string; name?: string },
   splitRouteCodeFromName: SplitRouteCodeFromName,
+  routeNameCodeDelimiter?: string,
 ): string {
   if (splitRouteCodeFromName === 'on') {
-    return parseRouteNameParts(getRouteSplitSource(route)).name || getRouteBaseDisplayLabel(route);
+    return (
+      parseRouteNameParts(getRouteSplitSource(route, routeNameCodeDelimiter), routeNameCodeDelimiter).name ||
+      getRouteBaseDisplayLabel(route)
+    );
   }
 
   return getRouteBaseDisplayLabel(route);
@@ -266,22 +309,29 @@ function getRouteDisplayLabel(
 function getRouteCapsuleLabel(
   route: { bullet?: string; name?: string },
   splitRouteCodeFromName: SplitRouteCodeFromName,
+  routeNameCodeDelimiter?: string,
 ): string {
   if (splitRouteCodeFromName === 'on') {
-    return parseRouteNameParts(getRouteSplitSource(route)).code || getRouteInitials(route);
+    return (
+      parseRouteNameParts(getRouteSplitSource(route, routeNameCodeDelimiter), routeNameCodeDelimiter).code ||
+      getRouteInitials(route)
+    );
   }
 
   return getRouteInitials(route);
 }
 
-function buildRouteBadgeDisplayLabelByBaseLabel(splitRouteCodeFromName: SplitRouteCodeFromName): Map<string, string> {
+function buildRouteBadgeDisplayLabelByBaseLabel(
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  routeNameCodeDelimiter?: string,
+): Map<string, string> {
   if (!api?.gameState) return new Map();
 
   const displayLabelByBaseLabel = new Map<string, string>();
   api.gameState.getRoutes().forEach((route) => {
-    const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName);
-    const splitSource = getRouteSplitSource(route);
-    const parsedName = parseRouteNameParts(splitSource);
+    const displayLabel = getRouteDisplayLabel(route, splitRouteCodeFromName, routeNameCodeDelimiter);
+    const splitSource = getRouteSplitSource(route, routeNameCodeDelimiter);
+    const parsedName = parseRouteNameParts(splitSource, routeNameCodeDelimiter);
     [getRouteBaseDisplayLabel(route), normalizeLabelText(route.name ?? ''), splitSource, parsedName.code].forEach((baseLabel) => {
       if (baseLabel.length > 0) {
         displayLabelByBaseLabel.set(baseLabel, displayLabel);
@@ -292,8 +342,15 @@ function buildRouteBadgeDisplayLabelByBaseLabel(splitRouteCodeFromName: SplitRou
   return displayLabelByBaseLabel;
 }
 
-function setRouteBadgeDisplayLabels(lineBadges: NodeListOf<HTMLElement>, splitRouteCodeFromName: SplitRouteCodeFromName): void {
-  const routeBadgeDisplayLabelByBaseLabel = buildRouteBadgeDisplayLabelByBaseLabel(splitRouteCodeFromName);
+function setRouteBadgeDisplayLabels(
+  lineBadges: NodeListOf<HTMLElement>,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  routeNameCodeDelimiter?: string,
+): void {
+  const routeBadgeDisplayLabelByBaseLabel = buildRouteBadgeDisplayLabelByBaseLabel(
+    splitRouteCodeFromName,
+    routeNameCodeDelimiter,
+  );
 
   lineBadges.forEach((badge) => {
     const label = badge.querySelector<HTMLElement>(':scope > span') ?? badge;
@@ -741,6 +798,38 @@ function getRouteCapsuleStationNumber(
 
 function capsuleEntryHasStationNumber(entry: CapsuleTransferEntry): boolean {
   return entry.stationNumber.trim().length > 0;
+}
+
+function padRouteCodeStationNumber(stationNumber: string, zeroPad: number): string {
+  const trimmed = stationNumber.trim();
+  if (trimmed.length === 0 || zeroPad <= 0) return trimmed;
+  if (!/^\d+$/.test(trimmed)) return trimmed;
+
+  return trimmed.padStart(trimmed.length + zeroPad, '0');
+}
+
+function getRouteCodeEntryDisplay(
+  entry: CapsuleTransferEntry,
+  options: RouteCodeDisplayOptions,
+): RouteCodeEntryDisplay {
+  const showStationNumber = options.showStationNumber === 'on' && capsuleEntryHasStationNumber(entry);
+  const paddedStationNumber = padRouteCodeStationNumber(entry.stationNumber, options.zeroPad);
+
+  if (!showStationNumber) {
+    return {
+      showStationNumber: false,
+      label: entry.label,
+      stationNumber: '',
+      inlineText: entry.label,
+    };
+  }
+
+  return {
+    showStationNumber: true,
+    label: entry.label,
+    stationNumber: paddedStationNumber,
+    inlineText: `${entry.label}${paddedStationNumber}`,
+  };
 }
 
 function getCapsuleStationNumberSortValue(stationNumber: string): number {
@@ -1751,6 +1840,7 @@ function applyTransferCapsuleDotStyle(
   outlineColor: string,
   globalScale: number,
   entries: CapsuleTransferEntry[],
+  routeCodeDisplay: RouteCodeDisplayOptions,
 ): void {
   removeTransferCapsuleDots(dot);
   dot.style.clipPath = '';
@@ -1802,6 +1892,7 @@ function applyTransferCapsuleDotStyle(
     const row = rows[currentRowIndex];
     if (!row) return;
 
+    const display = getRouteCodeEntryDisplay(entry, routeCodeDisplay);
     const routeBox = document.createElement('span');
     const routeLabel = document.createElement('span');
     const stationNumber = document.createElement('span');
@@ -1810,14 +1901,14 @@ function applyTransferCapsuleDotStyle(
 
     routeBox.className = TRANSFER_CAPSULE_DOT_CLASS;
     routeBox.append(routeLabel);
-    if (capsuleEntryHasStationNumber(entry)) {
+    if (display.showStationNumber) {
       routeBox.append(stationNumber);
     }
     row.appendChild(routeBox);
 
     routeBox.style.display = 'grid';
     routeBox.style.gridTemplateRows =
-      capsuleEntryHasStationNumber(entry) ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)';
+      display.showStationNumber ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr)';
     routeBox.style.alignItems = 'center';
     routeBox.style.justifyItems = 'center';
     routeBox.style.width = 'max-content';
@@ -1833,7 +1924,7 @@ function applyTransferCapsuleDotStyle(
     routeBox.style.paddingLeft = `${Math.max(2, dotSize * 2.1 * globalScale)}px`;
     routeBox.style.paddingRight = `${Math.max(2, dotSize * 2.1 * globalScale)}px`;
 
-    routeLabel.textContent = entry.label;
+    routeLabel.textContent = display.label;
     routeLabel.style.display = 'flex';
     routeLabel.style.alignItems = 'center';
     routeLabel.style.justifyContent = 'center';
@@ -1846,8 +1937,8 @@ function applyTransferCapsuleDotStyle(
     routeLabel.style.lineHeight = '0.95';
     routeLabel.style.minHeight = '0';
 
-    if (capsuleEntryHasStationNumber(entry)) {
-      stationNumber.textContent = entry.stationNumber;
+    if (display.showStationNumber) {
+      stationNumber.textContent = display.stationNumber;
       stationNumber.style.display = 'flex';
       stationNumber.style.alignItems = 'center';
       stationNumber.style.justifyContent = 'center';
@@ -1930,6 +2021,7 @@ function applyTransferGummyWormDotStyle(
   globalScale: number,
   lineBadgeSize: number,
   entries: CapsuleTransferEntry[],
+  routeCodeDisplay: RouteCodeDisplayOptions,
 ): void {
   const segmentHeight = Math.max(16, lineBadgeSize * globalScale);
   const textSize = Math.max(10, segmentHeight * 0.62);
@@ -1978,17 +2070,14 @@ function applyTransferGummyWormDotStyle(
     const row = rows[currentRowIndex];
     if (!row) return;
 
+    const display = getRouteCodeEntryDisplay(entry, routeCodeDisplay);
     const segment = document.createElement('span');
     const label = document.createElement('span');
-    const stationNumber = document.createElement('span');
     const isFirst = entriesInCurrentRow === 0;
     const isLast = entriesInCurrentRow === rowSizes[currentRowIndex] - 1;
 
     segment.className = TRANSFER_CAPSULE_DOT_CLASS;
     segment.append(label);
-    if (capsuleEntryHasStationNumber(entry)) {
-      segment.append(stationNumber);
-    }
     row.appendChild(segment);
 
     segment.style.display = 'inline-flex';
@@ -2008,23 +2097,13 @@ function applyTransferGummyWormDotStyle(
     segment.style.overflow = 'hidden';
     segment.style.pointerEvents = 'none';
 
-    label.textContent = entry.label;
+    label.textContent = display.inlineText;
     label.style.color = entry.textColor;
     label.style.fontFamily = 'inherit';
     label.style.fontSize = `${textSize}px`;
     label.style.fontWeight = '800';
     label.style.lineHeight = '1';
     label.style.whiteSpace = 'nowrap';
-
-    if (capsuleEntryHasStationNumber(entry)) {
-      stationNumber.textContent = entry.stationNumber;
-      stationNumber.style.color = entry.textColor;
-      stationNumber.style.fontFamily = 'inherit';
-      stationNumber.style.fontSize = `${textSize}px`;
-      stationNumber.style.fontWeight = '800';
-      stationNumber.style.lineHeight = '1';
-      stationNumber.style.whiteSpace = 'nowrap';
-    }
 
     entriesInCurrentRow += 1;
     if (entriesInCurrentRow >= rowSizes[currentRowIndex]) {
@@ -2260,12 +2339,19 @@ function applyMarkerAppearance(root: ParentNode): void {
     joinTransferNamesOrder,
     preserveJoinedTransferNamesOnZoomOut,
     splitRouteCodeFromName,
+    showRouteCodeStationNumber,
+    routeCodeStationNumberZeroPad,
+    routeNameCodeDelimiter,
     routeIconWrapWidth,
     routeSortByShape,
     routeSortDirection,
     transferDotColor,
     transferDotOutlineColor,
   } = getMarkerAppearance();
+  const routeCodeDisplay: RouteCodeDisplayOptions = {
+    showStationNumber: showRouteCodeStationNumber,
+    zeroPad: routeCodeStationNumberZeroPad,
+  };
   const dots = root.querySelectorAll<HTMLElement>(STATION_DOT_SELECTOR);
   const lineBadgeRows = root.querySelectorAll<HTMLElement>(LINE_BADGE_ROW_SELECTOR);
   const lineBadgeWrappers = root.querySelectorAll<HTMLElement>(LINE_BADGE_WRAPPER_SELECTOR);
@@ -2274,7 +2360,7 @@ function applyMarkerAppearance(root: ParentNode): void {
   const editRouteOrderButtons = root.querySelectorAll<HTMLElement>(EDIT_ROUTE_ORDER_BUTTON_SELECTOR);
   const stationNames = root.querySelectorAll<HTMLElement>(STATION_NAME_SELECTOR);
 
-  setRouteBadgeDisplayLabels(lineBadges, splitRouteCodeFromName);
+  setRouteBadgeDisplayLabels(lineBadges, splitRouteCodeFromName, routeNameCodeDelimiter);
   sortRouteBadges(root, routeSortDirection, routeSortByShape);
 
   lineBadgeRows.forEach((row) => {
@@ -2555,6 +2641,7 @@ function applyMarkerAppearance(root: ParentNode): void {
             globalScale,
             lineBadgeSize,
             gummyEntries,
+            routeCodeDisplay,
           );
           if (marker instanceof HTMLElement) {
             tightenCapsuleLabelSpacing(marker, dot, globalScale);
@@ -2580,6 +2667,7 @@ function applyMarkerAppearance(root: ParentNode): void {
             transferDotOutlineColor,
             globalScale,
             capsuleEntries,
+            routeCodeDisplay,
           );
           if (marker instanceof HTMLElement) {
             tightenCapsuleLabelSpacing(marker, dot, globalScale);
@@ -2805,7 +2893,7 @@ if (!api) {
           icon: 'Circle',
           tooltip: TOOLBAR_PANEL_TITLE,
           title: TOOLBAR_PANEL_TITLE,
-          width: 1000,
+          width: 1300,
           render: MarkerAppearanceToolbarHost,
         });
       }
