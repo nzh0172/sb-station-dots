@@ -48,11 +48,6 @@ const CLEANUP_KEY = '__markerAppearanceCleanup';
 const TOOLBAR_PANEL_TITLE = 'Station Dots';
 const TRANSFER_CAPSULE_DOT_CLASS = 'station-dots-transfer-capsule-dot';
 const TRANSFER_CAPSULE_ROW_CLASS = 'station-dots-transfer-capsule-row';
-const CAPSULE_ENTRIES_CACHE_KEY = 'stationDotsCapsuleCache';
-const CAPSULE_ENTRIES_CACHE_SPLIT_KEY = 'stationDotsCapsuleCacheSplit';
-const ROUTE_COLORS_CACHE_KEY = 'stationDotsRouteColorsCache';
-const ROUTE_LABELS_CACHE_KEY = 'stationDotsRouteLabelsCache';
-const ROUTE_COLOR_CACHE_KEY = 'stationDotsRouteColor';
 
 type CleanupHandle = {
   observer?: MutationObserver;
@@ -405,46 +400,6 @@ function getMarkerRouteBadgeLabelsInDisplayOrder(marker: HTMLElement): string[] 
     .filter((label) => label.length > 0);
 }
 
-function getCachedMarkerRouteLabels(marker: HTMLElement): string[] {
-  const rawCache = marker.dataset[ROUTE_LABELS_CACHE_KEY];
-  if (!rawCache) return [];
-
-  try {
-    const parsed = JSON.parse(rawCache) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter((value): value is string => typeof value === 'string' && value.length > 0);
-  } catch {
-    return [];
-  }
-}
-
-function cacheMarkerRouteLabels(marker: HTMLElement, routeLabels: string[]): void {
-  if (routeLabels.length === 0) return;
-
-  const cachedLabels = getCachedMarkerRouteLabels(marker);
-  if (routeLabels.length >= cachedLabels.length) {
-    marker.dataset[ROUTE_LABELS_CACHE_KEY] = JSON.stringify(routeLabels);
-    return;
-  }
-
-  if (Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM) {
-    marker.dataset[ROUTE_LABELS_CACHE_KEY] = JSON.stringify(routeLabels);
-  }
-}
-
-function getEffectiveMarkerRouteLabels(marker: HTMLElement): string[] {
-  const liveLabels = getMarkerRouteBadgeLabels(marker);
-  if (liveLabels.length > 0) {
-    cacheMarkerRouteLabels(marker, liveLabels);
-  }
-
-  const cachedLabels = getCachedMarkerRouteLabels(marker);
-  if (liveLabels.length >= cachedLabels.length) return liveLabels;
-
-  return cachedLabels.length > 0 ? cachedLabels : liveLabels;
-}
-
 function getRouteInitials(route: { bullet?: string; name?: string }): string {
   const bullet = normalizeLabelText(route.bullet ?? '');
   if (bullet.length > 0) return bullet;
@@ -788,10 +743,6 @@ function capsuleEntryHasStationNumber(entry: CapsuleTransferEntry): boolean {
   return entry.stationNumber.trim().length > 0;
 }
 
-function countCapsuleEntriesWithStationNumbers(entries: CapsuleTransferEntry[]): number {
-  return entries.filter(capsuleEntryHasStationNumber).length;
-}
-
 function getCapsuleStationNumberSortValue(stationNumber: string): number {
   const parsed = Number.parseInt(stationNumber, 10);
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
@@ -843,12 +794,9 @@ function getCapsuleTransferEntries(
 ): CapsuleTransferEntry[] {
   if (!api?.gameState) return [];
 
-  const markerRouteLabels = getEffectiveMarkerRouteLabels(marker);
+  const markerRouteLabels = getMarkerRouteBadgeLabels(marker);
   const markerRouteLabelsInDisplayOrder = getMarkerRouteBadgeLabelsInDisplayOrder(marker);
-  const cachedRouteLabels = getCachedMarkerRouteLabels(marker);
-  const markerRouteLabelOrder = new Map(
-    [...markerRouteLabelsInDisplayOrder, ...cachedRouteLabels].map((label, index) => [label, index]),
-  );
+  const markerRouteLabelOrder = new Map(markerRouteLabelsInDisplayOrder.map((label, index) => [label, index]));
   const markerStationName = getMarkerStationBaseName(marker);
   if (markerRouteLabels.length === 0 && markerStationName.length === 0) return [];
 
@@ -1131,108 +1079,6 @@ function getCapsuleStationEntries(
   return getCapsuleStationEntriesByName(markerStationName, splitRouteCodeFromName, badgeColorByLabel);
 }
 
-function isCapsuleTransferEntry(value: unknown): value is CapsuleTransferEntry {
-  if (typeof value !== 'object' || value === null) return false;
-
-  const entry = value as Partial<CapsuleTransferEntry>;
-  return (
-    typeof entry.label === 'string' &&
-    typeof entry.stationNumber === 'string' &&
-    typeof entry.routeColor === 'string' &&
-    typeof entry.textColor === 'string'
-  );
-}
-
-function getCachedMarkerCapsuleEntries(
-  marker: HTMLElement,
-  splitRouteCodeFromName: SplitRouteCodeFromName,
-): CapsuleTransferEntry[] {
-  if (marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] !== splitRouteCodeFromName) return [];
-
-  const rawCache = marker.dataset[CAPSULE_ENTRIES_CACHE_KEY];
-  if (!rawCache) return [];
-
-  try {
-    const parsed = JSON.parse(rawCache) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter(isCapsuleTransferEntry);
-  } catch {
-    return [];
-  }
-}
-
-function cacheMarkerCapsuleEntries(
-  marker: HTMLElement,
-  splitRouteCodeFromName: SplitRouteCodeFromName,
-  entries: CapsuleTransferEntry[],
-): void {
-  if (entries.length === 0) return;
-  if (!shouldUpdateCapsuleEntriesCache(marker, splitRouteCodeFromName, entries)) return;
-
-  marker.dataset[CAPSULE_ENTRIES_CACHE_KEY] = JSON.stringify(entries);
-  marker.dataset[CAPSULE_ENTRIES_CACHE_SPLIT_KEY] = splitRouteCodeFromName;
-}
-
-function shouldUpdateCapsuleEntriesCache(
-  marker: HTMLElement,
-  splitRouteCodeFromName: SplitRouteCodeFromName,
-  newEntries: CapsuleTransferEntry[],
-): boolean {
-  if (newEntries.length === 0) return false;
-
-  const cachedEntries = getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
-  if (cachedEntries.length === 0) return true;
-  if (newEntries.length > cachedEntries.length) return true;
-  if (
-    newEntries.length === cachedEntries.length &&
-    countCapsuleEntriesWithStationNumbers(newEntries) > countCapsuleEntriesWithStationNumbers(cachedEntries)
-  ) {
-    return true;
-  }
-  if (newEntries.length >= cachedEntries.length) return true;
-
-  return Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM;
-}
-
-function cacheMarkerRouteColors(marker: HTMLElement, routeColors: string[]): void {
-  const normalizedColors = Array.from(
-    new Set(
-      routeColors
-        .map((color) => normalizeColor(color))
-        .filter((color) => color.length > 0 && color !== 'transparent' && color !== 'rgba(0,0,0,0)'),
-    ),
-  );
-  if (normalizedColors.length === 0) return;
-  if (!shouldUpdateRouteColorsCache(marker, normalizedColors)) return;
-
-  marker.dataset[ROUTE_COLORS_CACHE_KEY] = JSON.stringify(normalizedColors);
-}
-
-function getCachedMarkerRouteColors(marker: HTMLElement): string[] {
-  const rawCache = marker.dataset[ROUTE_COLORS_CACHE_KEY];
-  if (!rawCache) return [];
-
-  try {
-    const parsed = JSON.parse(rawCache) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter((value): value is string => typeof value === 'string' && value.length > 0);
-  } catch {
-    return [];
-  }
-}
-
-function shouldUpdateRouteColorsCache(marker: HTMLElement, newColors: string[]): boolean {
-  if (newColors.length === 0) return false;
-
-  const cachedColors = getCachedMarkerRouteColors(marker);
-  if (cachedColors.length === 0) return true;
-  if (newColors.length >= cachedColors.length) return true;
-
-  return Number.isFinite(currentMapZoom) && currentMapZoom >= TRANSFER_DOT_MULTI_ROUTE_DETAIL_MIN_ZOOM;
-}
-
 function shouldPreserveTransferDotRoutesOnZoomOut(
   preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
 ): boolean {
@@ -1292,35 +1138,28 @@ function resolveTransferDotRouteColors(
   splitRouteCodeFromName: SplitRouteCodeFromName,
   preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
 ): string[] {
-  const liveColors = Array.from(new Set(getMarkerRouteBadgeColors(marker)));
-  const effectiveRouteLabels = getEffectiveMarkerRouteLabels(marker);
+  let colors = Array.from(new Set(getMarkerRouteBadgeColors(marker)));
 
-  if (liveColors.length > 0) {
-    cacheMarkerRouteColors(marker, liveColors);
-  } else if (effectiveRouteLabels.length > 0 && api?.gameState) {
-    const routes = api.gameState.getRoutes();
-    const colorsFromLabels = effectiveRouteLabels
-      .map((label) => {
-        const route = routes.find((entry) => getRouteDisplayLabel(entry, splitRouteCodeFromName) === label);
-        return route?.color ?? '';
-      })
-      .filter((color) => color.length > 0);
-    if (colorsFromLabels.length > 0) {
-      cacheMarkerRouteColors(marker, colorsFromLabels);
+  if (colors.length === 0 && api?.gameState) {
+    const routeLabels = getMarkerRouteBadgeLabels(marker);
+    if (routeLabels.length > 0) {
+      const routes = api.gameState.getRoutes();
+      colors = routeLabels
+        .map((label) => {
+          const route = routes.find((entry) => getRouteDisplayLabel(entry, splitRouteCodeFromName) === label);
+          return route?.color ?? '';
+        })
+        .filter((color) => color.length > 0);
     }
   }
 
-  const cachedColors = getCachedMarkerRouteColors(marker);
   const preserveRoutes = shouldPreserveTransferDotRoutesOnZoomOut(preserveTransferDotRoutesOnZoomOut);
-  const effectiveLiveColors = liveColors.length > 0 ? liveColors : cachedColors.length > 0 ? cachedColors : ['#ffffff'];
-  const bestColors =
-    preserveRoutes && cachedColors.length > effectiveLiveColors.length ? cachedColors : effectiveLiveColors;
 
-  if (!preserveRoutes && bestColors.length > 1) {
-    return [bestColors[0]];
+  if (!preserveRoutes && colors.length > 1) {
+    return [colors[0]];
   }
 
-  return bestColors.length > 0 ? bestColors : ['#ffffff'];
+  return colors.length > 0 ? colors : ['#ffffff'];
 }
 
 function getMarkerCapsuleEntries(
@@ -1328,27 +1167,8 @@ function getMarkerCapsuleEntries(
   splitRouteCodeFromName: SplitRouteCodeFromName,
   preserveTransferDotRoutesOnZoomOut: PreserveTransferDotRoutesOnZoomOut,
 ): CapsuleTransferEntry[] {
-  const cachedEntries = getCachedMarkerCapsuleEntries(marker, splitRouteCodeFromName);
-  const transferEntries = getCapsuleTransferEntries(marker, splitRouteCodeFromName);
-
-  if (transferEntries.length > 0) {
-    if (shouldUpdateCapsuleEntriesCache(marker, splitRouteCodeFromName, transferEntries)) {
-      cacheMarkerCapsuleEntries(marker, splitRouteCodeFromName, transferEntries);
-    }
-  }
-
+  const entries = getCapsuleTransferEntries(marker, splitRouteCodeFromName);
   const preserveRoutes = shouldPreserveTransferDotRoutesOnZoomOut(preserveTransferDotRoutesOnZoomOut);
-  let entries = transferEntries;
-
-  if (entries.length === 0) {
-    entries = cachedEntries;
-  } else if (
-    preserveRoutes &&
-    cachedEntries.length > entries.length &&
-    countCapsuleEntriesWithStationNumbers(cachedEntries) >= countCapsuleEntriesWithStationNumbers(entries)
-  ) {
-    entries = cachedEntries;
-  }
 
   if (!preserveRoutes && entries.length > 1) {
     return entries.slice(0, 1);
@@ -1780,23 +1600,30 @@ function applyNormalStationDotShape(dot: HTMLElement, shape: NormalStationDotSha
   dot.style.borderRadius = '9999px';
 }
 
-function cacheMarkerRouteColor(marker: HTMLElement, routeColor: string): void {
-  const normalizedColor = normalizeColor(routeColor);
-  if (normalizedColor.length > 0 && normalizedColor !== 'transparent' && normalizedColor !== 'rgba(0,0,0,0)') {
-    marker.dataset[ROUTE_COLOR_CACHE_KEY] = normalizedColor;
-  }
-}
-
-function getCachedMarkerRouteColor(marker: HTMLElement): string | null {
-  const cachedColor = marker.dataset[ROUTE_COLOR_CACHE_KEY];
-  if (!cachedColor) return null;
-
-  const normalizedColor = normalizeColor(cachedColor);
-  if (normalizedColor.length === 0 || normalizedColor === 'transparent' || normalizedColor === 'rgba(0,0,0,0)') {
-    return null;
+function getNormalStationRouteColor(
+  marker: HTMLElement,
+  splitRouteCodeFromName: SplitRouteCodeFromName,
+  dot?: HTMLElement,
+): string {
+  const badgeColors = getMarkerRouteBadgeColors(marker);
+  if (badgeColors.length > 0) {
+    return badgeColors[0];
   }
 
-  return normalizedColor;
+  if (dot) {
+    const nativeColor = getNativeStationDotRouteColor(dot);
+    if (nativeColor) return nativeColor;
+  }
+
+  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
+  if (stationEntries.length > 0) {
+    return stationEntries[0].routeColor;
+  }
+
+  const gameStateColor = getNormalStationRouteColorFromGameState(marker, splitRouteCodeFromName);
+  if (gameStateColor) return gameStateColor;
+
+  return '#666666';
 }
 
 function getNormalStationRouteColorFromGameState(
@@ -1847,43 +1674,6 @@ function getNativeStationDotRouteColor(dot: HTMLElement): string | null {
   }
 
   return backgroundColor;
-}
-
-function getNormalStationRouteColor(
-  marker: HTMLElement,
-  splitRouteCodeFromName: SplitRouteCodeFromName,
-  dot?: HTMLElement,
-): string {
-  const badgeColors = getMarkerRouteBadgeColors(marker);
-  if (badgeColors.length > 0) {
-    cacheMarkerRouteColor(marker, badgeColors[0]);
-    return badgeColors[0];
-  }
-
-  const cachedColor = getCachedMarkerRouteColor(marker);
-  if (cachedColor) return cachedColor;
-
-  if (dot) {
-    const nativeColor = getNativeStationDotRouteColor(dot);
-    if (nativeColor) {
-      cacheMarkerRouteColor(marker, nativeColor);
-      return nativeColor;
-    }
-  }
-
-  const stationEntries = getCapsuleStationEntries(marker, splitRouteCodeFromName);
-  if (stationEntries.length > 0) {
-    cacheMarkerRouteColor(marker, stationEntries[0].routeColor);
-    return stationEntries[0].routeColor;
-  }
-
-  const gameStateColor = getNormalStationRouteColorFromGameState(marker, splitRouteCodeFromName);
-  if (gameStateColor) {
-    cacheMarkerRouteColor(marker, gameStateColor);
-    return gameStateColor;
-  }
-
-  return '#666666';
 }
 
 function applyNormalStationRouteFill(dot: HTMLElement, routeColor: string): void {
